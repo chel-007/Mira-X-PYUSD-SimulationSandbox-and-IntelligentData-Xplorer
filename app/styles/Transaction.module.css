@@ -1,0 +1,247 @@
+ /* Transaction Tab */
+
+ .canvas {
+    flex-grow: 1;
+    /* background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="25" height="25"><circle cx="20" cy="20" r="1" fill="white"/></svg>') repeat; */
+    position: relative;
+    font-family: "Josefin Sans", sans-serif;
+    font-weight: 200;
+}
+
+ .centerButton {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 999;
+}
+
+
+.plusButton {
+    width: 60px;
+    height: 60px;
+    background-color: #7BCFFF;
+    color: #010214;
+    border: none;
+    border-radius: 50%; /* Circle */
+    font-size: 2rem; /* Big + */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    opacity: 1;
+  }
+  
+.plusButton:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 15px #7bcfffaf;
+}
+
+
+.optionsNode {
+    background: #010214;
+    padding: 0.5rem;
+    border-radius: 8px;
+    border: 1px solid #7BCFFF;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    width: 120px; /* Fixed width to keep it compact */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  }
+  
+  /* .optionButton {
+    background: #010214;
+    color: #7BCFFF;
+    border: none;
+    padding: 0.5rem;
+    cursor: pointer;
+    text-align: left;
+    font-size: 0.9rem;
+  } */
+
+  .optionButton {
+    background: #010214;
+    color: #7BCFFF;
+    border: none;
+    padding: 0.5rem 0.4rem;
+    cursor: pointer;
+    text-align: left;
+    font-size: 0.9rem;
+    display: inline-block; /* Fits content width */
+    white-space: nowrap; /* Prevents text wrapping */
+  }
+  
+  .optionButton:hover {
+    background: #7BCFFF;
+    color: #010214;
+  }
+  
+  .transactionNode {
+    background: #010214;
+    padding: 1rem;
+    border-radius: 8px;
+    color: #fff;
+    width: 150px;
+  }
+  
+  .nodeContent {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+.nodePlus {
+    background: #7BCFFF;
+    color: #010214;
+    align-items: center;
+    justify-content: center;
+    width: 21%;
+    height: fit-content;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 1px solid #7BCFFF;
+}
+  
+  .nodePlus:hover {
+    color: white;
+    background: #010214;
+    border: 1px solid #7BCFFF;
+  }
+  
+  .textInputNode {
+    background: #010214;
+    padding: 1rem;
+    border-radius: 8px;
+    color: #fff;
+  }
+  
+  .textInputNode input {
+    background: #010214;
+    color: #fff;
+    border: 1px solid #7BCFFF;
+    padding: 0.5rem;
+    width: 100%;
+  }
+  
+  .textInputNode form {
+    /* padding: 0;
+    margin: 0; */
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .textInputNode .submitButton {
+    background: none;
+    border: none;
+    margin-top: 8px;
+    /* padding: 0; */
+    cursor: pointer;
+    color: #7BCFFF;
+    font-size: 1.5rem; /* Adjust icon size */
+  }
+  
+  .textInputNode .submitButton:hover {
+    color: #fff; /* Hover effect */
+  }
+  
+  .restartButton {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    border-radius: 50%;
+    color: rgba(255, 255, 255, 0.75);
+    border: none;
+    font-size: 28px;
+    font-weight: 100;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    z-index: 999;
+  }
+  
+  .restartButton:hover {
+    color:#7bcfffbd
+  }
+
+  .digDeeperButton {
+    opacity: 0; /* Start invisible for fade-in */
+    animation: fadeIn 0.5s ease-in forwards, pulse 2.5s infinite; /* Fade in then pulse */
+  }
+
+  .digDeeperButton:hover {
+    animation: fadeIn 0.5s ease-in forwards, pulse 2.5s none;
+  }
+  
+  .digDeeperButton button {
+    background: rgba(129, 132, 153, 0.08);
+    color: rgba(255, 255, 255, 0.92);
+    border: none;
+    /* padding: 16px 20px; */
+    width: 50px;
+    height: 50px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    z-index: 999;
+  }
+  
+  .digDeeperButton button:hover {
+    background: rgba(129, 132, 153, 0.256);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .digDeeperButton button:hover i{
+    color: #7BCFFF;
+  }
+  
+  @keyframes fadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  
+  @keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.7; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .inspectNode {
+    background: #010214;
+    padding: 1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    color: #fff;
+    display: flex;
+    align-items: center;
+  }
+  
+  .inspectContent {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .tableNode {
+    background: rgba(129, 132, 153, 0.08);
+    padding: 10px;
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.75);
+    max-width: 500px;
+  }
+  
+  .tableNode table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .tableNode td {
+    padding: 10px;
+    border-bottom: 1px solid #444;
+  }

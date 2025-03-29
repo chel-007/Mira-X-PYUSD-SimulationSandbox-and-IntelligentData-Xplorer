@@ -1,0 +1,12 @@
+{
+    "name": "fetch-logs",
+    "version": "0.1.0",
+    "main": "index.js",
+    "scripts": {
+        "start": "node fetchLogs.js"
+    },
+    "dependencies": {
+        "@google-cloud/firestore": "^7.11.0",
+        "ws": "^8.18.1"
+    }
+}

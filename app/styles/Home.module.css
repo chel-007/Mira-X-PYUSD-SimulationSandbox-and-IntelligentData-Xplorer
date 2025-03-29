@@ -1,0 +1,250 @@
+
+.container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #010214;
+  overflow: hidden;
+}
+
+.appContainer {
+  /* Remove absolute positioning */
+  padding: 20px 0;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0; /* Prevent shrinking */
+}
+
+.betaBadge {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+  border-radius: 18px;
+  padding: 5px 10px;
+  font-size: 9px;
+}
+
+.appName {
+  margin-right: 7px;
+  font-size: 26px;
+  color: white;
+  font-family: "Red Rose", serif;
+}
+
+.appName span {
+  color: #7BCFFF;
+}
+
+/* Wrapper for tagline and box to center them in the remaining space */
+.contentWrapper {
+  flex: 1; /* Grow to fill remaining space */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.tagline {
+  margin-bottom: 80px;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.7);
+  text-align: center;
+  font-family: "Josefin Sans", sans-serif;
+  font-weight: 200;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 14px 25px;
+  border-radius: 100px;
+  background-color: rgba(129, 132, 153, 0.15);
+}
+
+.highlight {
+  color: #7BCFFF;
+  font-weight: 400;
+}
+
+.box {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-start;
+  width: 60%;
+  max-width: 1000px;
+  padding: 35px;
+  background: rgba(129, 132, 153, 0.15);
+  border-radius: 15px;
+  box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.feature {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  text-align: center;
+  padding: 24px;
+  width: 280px;
+}
+
+.feature:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 30%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 50%;
+  background: linear-gradient(
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0.2),
+    rgba(255, 255, 255, 0)
+  );
+}
+
+.largeText {
+  font-size: 26px;
+  font-family: "Red Rose", serif;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 10px;
+}
+
+.subtext {
+  font-size: 14px;
+  font-weight: 200;
+  font-family: "Josefin Sans", serif;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 30px;
+}
+
+.featureButton {
+  width: 100%;
+  padding: 10px;
+  border-radius: 100px;
+  border: none;
+  font-family: "Red Rose", serif;
+  font-size: 14px;
+  cursor: pointer;
+  margin-top: 25px;
+  transition: background-color 0.3s ease;
+}
+
+.featureButton i {
+  margin-left: 10px;
+  font-size: 12px;
+}
+
+.trade {
+  background-color: white;
+}
+
+.trade:hover {
+  background-color: rgba(255, 255, 255, 0.94);
+}
+
+.xplore {
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.xplore:hover {
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.battle {
+  color: white;
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+}
+
+.battle:hover {
+  background-color: black;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+/* Media query for mobile devices (below 768px) */
+@media (max-width: 768px) {
+  .box {
+    flex-direction: column; /* Stack features vertically */
+    align-items: center; /* Center features horizontally */
+    width: 90%; /* Use more of the screen width */
+    max-width: none; /* Remove max-width constraint */
+    padding: 20px; /* Reduce padding for smaller screens */
+  }
+
+  .feature {
+    width: 100%; /* Take full width of the container */
+    max-width: 300px; /* Limit the maximum width for readability */
+    padding: 16px; /* Reduce padding */
+    margin-bottom: 20px; /* Add space between stacked features */
+  }
+
+  /* Remove the vertical separator on mobile */
+  .feature:not(:last-child)::before {
+    display: none; /* Hide the separator */
+  }
+
+  /* Adjust font sizes and spacing for mobile */
+  .largeText {
+    font-size: 20px; /* Smaller font size */
+  }
+
+  .subtext {
+    font-size: 12px; /* Smaller font size */
+    margin-bottom: 20px; /* Reduce margin */
+  }
+
+  .featureButton {
+    font-size: 12px; /* Smaller font size */
+    padding: 8px; /* Reduce padding */
+    margin-top: 15px; /* Reduce margin */
+  }
+
+  .featureButton i {
+    font-size: 10px; /* Smaller icon size */
+  }
+}
+
+/* Optional: Additional adjustments for very small screens (below 480px) */
+@media (max-width: 480px) {
+  .box {
+    width: 95%; /* Use almost the full width */
+    padding: 15px; /* Further reduce padding */
+  }
+
+  .feature {
+    padding: 12px; /* Further reduce padding */
+    margin-bottom: 15px; /* Reduce space between features */
+  }
+
+  .largeText {
+    font-size: 18px; /* Even smaller font size */
+  }
+
+  .subtext {
+    font-size: 11px; /* Even smaller font size */
+    margin-bottom: 15px; /* Further reduce margin */
+  }
+
+  .featureButton {
+    font-size: 11px; /* Even smaller font size */
+    padding: 6px; /* Further reduce padding */
+    margin-top: 10px; /* Further reduce margin */
+  }
+}
+
+.footer {
+  /* Remove fixed positioning */
+  font-family: "Josefin Sans", serif;
+  color: rgba(255, 255, 255, 0.6);
+  width: 100%;
+  padding: 10px 20px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  flex-shrink: 0; /* Prevent shrinking */
+}
