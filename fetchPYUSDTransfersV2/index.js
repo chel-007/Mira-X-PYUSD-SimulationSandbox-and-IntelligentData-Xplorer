@@ -50,13 +50,18 @@ async function fetchWithRetry(method, params, retries = 3, delay = 1000) {
           }),
         }
       );
-      const result = await response.json();
-      if (result.error) throw new Error(result.error.message);
-      return result.result;
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error.message);
+      }
+      return data.result;
     } catch (error) {
-      if (i === retries - 1) throw error;
-      console.warn(`Retrying ${method} (attempt ${i + 1}/${retries})...`, error.message);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      console.warn(`Retrying ${method} (attempt ${attempt}/${retries})... ${error.message}`);
+      if (attempt === retries) {
+        console.error(`Failed ${method} after ${retries} attempts: ${error.message}`);
+        return null; // Return null as last resort
+      }
+      await new Promise(resolve => setTimeout(resolve, delay * attempt)); // Exponential backoff
     }
   }
 }
@@ -81,13 +86,28 @@ async function getTransactionDetails(txHash) {
     fetchWithRetry("eth_getTransactionByHash", [txHash]),
     fetchWithRetry("eth_getTransactionReceipt", [txHash]),
   ]);
+  // Fallback values if fetch fails
+  const safeTx = tx || {};
+  const safeReceipt = receipt || {};
+
+  const gasPriceRaw = safeTx.gasPrice || "0x0"; // Default to 0 if missing
+  const gasUsedRaw = safeReceipt.gasUsed || "0x0"; // Default to 0 if missing
+
+  const gasPrice = parseInt(gasPriceRaw, 16);
+  const gasUsed = parseInt(gasUsedRaw, 16);
+
+  // Log invalid data for debugging
+  if (isNaN(gasPrice) || isNaN(gasUsed)) {
+    console.warn(`Invalid gas data for tx ${txHash}`, { gasPriceRaw, gasUsedRaw });
+  }
+
   return {
-    input: tx.input || '0x',
-    gasPrice: parseInt(tx.gasPrice, 16),
-    gasUsed: parseInt(receipt.gasUsed, 16),
-    status: parseInt(receipt.status, 16),
-    fromAddress: tx.from.toLowerCase(),
-    toAddress: tx.to ? tx.to.toLowerCase() : null,
+    input: safeTx.input || '0x',
+    gasPrice: isNaN(gasPrice) ? 0 : gasPrice, // Fallback to 0
+    gasUsed: isNaN(gasUsed) ? 0 : gasUsed,    // Fallback to 0
+    status: parseInt(safeReceipt.status || "0x1", 16), // Assume success if missing
+    fromAddress: safeTx.from ? safeTx.from.toLowerCase() : null,
+    toAddress: safeTx.to ? safeTx.to.toLowerCase() : null,
   };
 }
 

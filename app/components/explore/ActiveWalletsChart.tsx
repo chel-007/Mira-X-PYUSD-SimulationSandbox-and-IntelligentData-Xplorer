@@ -22,13 +22,12 @@ const ActiveWalletsChart: React.FC<ActiveWalletsChartProps> = ({ activeWallets, 
     const svg = d3.select(activeWalletsRef.current);
     const width = chartContainerRef.current?.clientWidth || 600;
     const height = chartContainerRef.current?.clientHeight || 600;
-    const margin = { top: 1, bottom: 10 }; // Define margins for top and bottom
-    const adjustedHeight = height - margin.top - margin.bottom; // Adjust height for margins
+    const margin = { top: 1, bottom: 10 };
+    const adjustedHeight = height - margin.top - margin.bottom;
     const radius = Math.min(width, adjustedHeight) / 2;
 
-    // Calculate font sizes based on chart size
-    const baseFontSize = radius * 0.12; // 12% of radius for percentage labels
-    const totalFontSize = radius * 0.13; // 10% of radius for total text
+    const baseFontSize = radius * 0.13;
+    const totalFontSize = radius * 0.14;
 
     const totalWallets = activeWallets + dormantWallets;
     const data = [
@@ -40,7 +39,6 @@ const ActiveWalletsChart: React.FC<ActiveWalletsChartProps> = ({ activeWallets, 
       svg.selectAll("*").remove();
     }
 
-    // Center the chart, accounting for top margin
     const g = svg.select("g").empty()
       ? svg.append("g").attr("transform", `translate(${width / 2},${height / 2})`)
       : svg.select("g").attr("transform", `translate(${width / 2},${height / 2})`);
@@ -53,6 +51,7 @@ const ActiveWalletsChart: React.FC<ActiveWalletsChartProps> = ({ activeWallets, 
       .outerRadius(radius * 1);
 
     if (isFirstMount.current) {
+      // Initial render with animation
       const slices = g.selectAll(".arc")
         .data(pie(data))
         .enter()
@@ -72,10 +71,9 @@ const ActiveWalletsChart: React.FC<ActiveWalletsChartProps> = ({ activeWallets, 
         .attr("font-size", baseFontSize)
         .attr("transform", d => {
           const centroid = arc.centroid(d);
-          // Adjust "Active" label position (assumed to be the first slice)
           if (d.data.label === "Active") {
-            const offsetY = -radius * 0.01; // Move up by 20% of radius
-            return `translate(${centroid[0]}, ${centroid[1] + offsetY})`;
+            const offsetY = -baseFontSize * 0.5; // Shift up by half the font size
+            return `translate(${centroid[0]}, ${centroid[1]})`;
           }
           return `translate(${centroid[0]}, ${centroid[1]})`;
         })
@@ -83,16 +81,16 @@ const ActiveWalletsChart: React.FC<ActiveWalletsChartProps> = ({ activeWallets, 
         .attr("opacity", 0);
 
       const totalText = g.append("text")
+        .attr("class", "total-text")
         .attr("text-anchor", "middle")
         .attr("fill", "#fff")
-        .attr("y", 5) // Center vertically
+        .attr("y", 5)
         .attr("font-size", totalFontSize)
         .text(`Total: ${totalWallets}`)
         .attr("opacity", 0);
 
       gsap.to(slices.nodes(), {
         opacity: 1,
-        scale: 1,
         duration: 2,
         ease: "power2.out",
         stagger: 0.3,
@@ -110,70 +108,84 @@ const ActiveWalletsChart: React.FC<ActiveWalletsChartProps> = ({ activeWallets, 
 
       isFirstMount.current = false;
     } else {
-      const slices = g.selectAll(".arc")
-        .data(pie(data));
-
-      slices.enter()
+      // Updates with smooth transitions
+      const slices = g.selectAll(".arc").data(pie(data));
+    
+      const enteringSlices = slices.enter()
         .append("path")
         .attr("class", "arc")
         .attr("fill", d => d.data.color)
         .attr("opacity", 0)
-        .attr("d", arc)
-        .transition()
-        .duration(500)
-        .attr("opacity", 1);
-
-      slices.transition()
-        .duration(500)
         .attr("d", arc);
-
-      slices.exit().remove();
-
-      const labels = g.selectAll(".label")
-        .data(pie(data));
-
-      labels.enter()
+      if (enteringSlices.size()) {
+        gsap.to(enteringSlices.nodes(), { opacity: 1, duration: 0.5 });
+      }
+    
+      slices.transition().duration(500).attr("d", arc);
+    
+      const exitingSlices = slices.exit();
+      if (exitingSlices.size()) {
+        gsap.to(exitingSlices.nodes(), { opacity: 0, duration: 0.5, onComplete: () => exitingSlices.remove() });
+      }
+    
+      const labels = g.selectAll(".label").data(pie(data));
+    
+      const enteringLabels = labels.enter()
         .append("text")
         .attr("class", "label")
         .attr("fill", "#fff")
         .attr("text-anchor", "middle")
-        .attr("opacity", 0)
         .attr("font-size", baseFontSize)
         .attr("transform", d => {
           const centroid = arc.centroid(d);
           if (d.data.label === "Active") {
-            const offsetY = -radius * 0.2; // Move up by 20% of radius
+            const offsetY = -baseFontSize * 0.5; // Consistent with initial render
             return `translate(${centroid[0]}, ${centroid[1] + offsetY})`;
           }
           return `translate(${centroid[0]}, ${centroid[1]})`;
         })
         .text(d => totalWallets ? `${((d.data.value / totalWallets) * 100).toFixed(1)}%` : "0%")
-        .transition()
-        .duration(500)
-        .attr("opacity", 1);
-
+        .attr("opacity", 0);
+      if (enteringLabels.size()) {
+        gsap.to(enteringLabels.nodes(), { opacity: 1, duration: 0.5 });
+      }
+    
       labels.transition()
         .duration(500)
         .attr("font-size", baseFontSize)
         .attr("transform", d => {
           const centroid = arc.centroid(d);
           if (d.data.label === "Active") {
-            const offsetY = -radius * 0.2; // Move up by 20% of radius
+            const offsetY = -baseFontSize * 0.5; // Consistent with initial render
             return `translate(${centroid[0]}, ${centroid[1] + offsetY})`;
           }
           return `translate(${centroid[0]}, ${centroid[1]})`;
         })
         .text(d => totalWallets ? `${((d.data.value / totalWallets) * 100).toFixed(1)}%` : "0%");
-
-      labels.exit().remove();
-
-      g.select("text")
-        .text(`Total: ${totalWallets}`)
-        .attr("y", 5) // Ensure it stays centered
-        .attr("font-size", totalFontSize) // Update font size on resize
-        .transition()
-        .duration(500)
-        .attr("opacity", 0.6);
+    
+      const exitingLabels = labels.exit();
+      if (exitingLabels.size()) {
+        gsap.to(exitingLabels.nodes(), { opacity: 0, duration: 0.5, onComplete: () => exitingLabels.remove() });
+      }
+    
+      const totalText = g.select(".total-text");
+      if (totalText.empty()) {
+        const newTotalText = g.append("text")
+          .attr("class", "total-text")
+          .attr("text-anchor", "middle")
+          .attr("fill", "#fff")
+          .attr("y", 5)
+          .attr("font-size", totalFontSize)
+          .text(`Total: ${totalWallets}`)
+          .attr("opacity", 0);
+        gsap.to(newTotalText.node(), { opacity: 0.6, duration: 0.5 });
+      } else {
+        totalText
+          .text(`Total: ${totalWallets}`)
+          .attr("font-size", totalFontSize)
+          .attr("y", 5);
+        gsap.to(totalText.node(), { opacity: 0.6, duration: 0.5 });
+      }
     }
   };
 
@@ -187,6 +199,7 @@ const ActiveWalletsChart: React.FC<ActiveWalletsChartProps> = ({ activeWallets, 
       }, 100);
     };
 
+    console.log("ActiveWalletsChart rendering with:", { activeWallets, dormantWallets, loading });
     renderChart();
 
     const resizeObserver = new ResizeObserver(() => handleResize());

@@ -7,8 +7,6 @@ import styles from "../../styles/Explore.module.css";
 interface GasFeeOverTimeData {
   event_date: string;
   event_type: string;
-  avg_gas_fee_eth: number;
-  avg_gas_fee_usd: number;
   gas_fee_volatility_eth: number;
   gas_fee_volatility_usd: number;
   transaction_count: number;

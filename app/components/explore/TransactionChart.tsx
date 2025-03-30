@@ -126,7 +126,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({ dailyData, monthlyD
       } else { // Data update
         path.datum(smoothedData)
           .transition()
-          .duration(500)
+          .duration(300)
           .attr("d", area);
       }
   

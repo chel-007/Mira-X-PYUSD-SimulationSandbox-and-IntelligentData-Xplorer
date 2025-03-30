@@ -32,7 +32,7 @@ const GasFeesChart: React.FC<GasFeesChartProps> = ({ gasFeeData, onZoom, onPan, 
     text: "rgba(255, 255, 255, 0.1)",
   };
 
-  // Create tooltip once
+  // Tooltip setup
   useEffect(() => {
     const tooltip = document.createElement("div");
     tooltip.className = "tooltip";
@@ -96,10 +96,10 @@ const GasFeesChart: React.FC<GasFeesChartProps> = ({ gasFeeData, onZoom, onPan, 
       .base(10)
       .clamp(true);
 
-    // Generate custom tick values for logarithmic scale
+    // Custom tick values for logarithmic scale
     const logMin = Math.log10(minGasFee);
     const logMax = Math.log10(maxGasFee);
-    const tickCount = 8; // Aim for ~6 ticks
+    const tickCount = 8;
     const tickStep = (logMax - logMin) / (tickCount - 1);
     const tickValues = Array.from({ length: tickCount }, (_, i) => {
       const logValue = logMin + i * tickStep;
@@ -110,7 +110,7 @@ const GasFeesChart: React.FC<GasFeesChartProps> = ({ gasFeeData, onZoom, onPan, 
       .domain(["Transfer", "Swap"])
       .range([colors.transfer, colors.swap]);
 
-    // Line generator with slight smoothing
+    // Line generator
     const line = d3.line<{ date: string; value: number }>()
       .x(d => x(d.date)! + x.bandwidth() / 2)
       .y(d => y(d.value > 0 ? d.value : minGasFee))
@@ -129,7 +129,8 @@ const GasFeesChart: React.FC<GasFeesChartProps> = ({ gasFeeData, onZoom, onPan, 
           .attr("class", `line-${eventType.toLowerCase()}`)
           .attr("fill", "none")
           .attr("stroke", color(eventType) as string)
-          .attr("stroke-width", 2);
+          .attr("stroke-width", 2)
+          .attr("d", line(lineData)); // Set initial path
       }
 
       const latestEntry = data
@@ -160,27 +161,28 @@ const GasFeesChart: React.FC<GasFeesChartProps> = ({ gasFeeData, onZoom, onPan, 
           .attr("opacity", 0);
       }
 
-      if (isFirstMount.current) {
-        path.datum(lineData)
-          .attr("d", line);
-
-        const totalLength = path.node()?.getTotalLength() || 0;
+      const pathNode = path.node() as SVGPathElement | null;
+      if (isFirstMount.current && pathNode) {
+        const totalLength = pathNode.getTotalLength();
         console.log(`Path length for ${eventType}:`, totalLength);
 
         if (totalLength > 0) {
+          // Set initial dash properties
           path
-            .attr("stroke-dasharray", `${totalLength} ${totalLength}`)
-            .attr("stroke-dashoffset", totalLength)
-            .transition()
-            .duration(1500)
-            .ease(d3.easeQuadOut)
-            .attr("stroke-dashoffset", 0)
-            .on("end", () => {
+            .attr("stroke-dasharray", totalLength)
+            .attr("stroke-dashoffset", totalLength);
+
+          // GSAP animation
+          gsap.to(pathNode, {
+            strokeDashoffset: 0,
+            duration: 4, // Customize this as you like (e.g., 3, 1.5)
+            ease: "power2.out",
+            onComplete: () => {
               if (latestEntry) {
-                circle.transition()
-                  .duration(500)
-                  .attr("opacity", 1)
-                  .on("end", () => {
+                gsap.to(circle.node(), {
+                  opacity: 1,
+                  duration: 0.5,
+                  onComplete: () => {
                     gsap.to(circle.node(), {
                       r: 6,
                       repeat: -1,
@@ -188,13 +190,15 @@ const GasFeesChart: React.FC<GasFeesChartProps> = ({ gasFeeData, onZoom, onPan, 
                       duration: 0.8,
                       ease: "power1.inOut",
                     });
-                  });
-
-                label.transition()
-                  .duration(500)
-                  .attr("opacity", 0.8);
+                  },
+                });
+                gsap.to(label.node(), {
+                  opacity: 0.8,
+                  duration: 0.5,
+                });
               }
-            });
+            },
+          });
         } else {
           console.warn(`Path for ${eventType} has zero length. Skipping animation.`);
           path.attr("stroke-dasharray", null)
@@ -205,7 +209,9 @@ const GasFeesChart: React.FC<GasFeesChartProps> = ({ gasFeeData, onZoom, onPan, 
           }
         }
       } else {
-        path.datum(lineData)
+        // Update without animation on subsequent renders
+        path
+          .datum(lineData)
           .transition()
           .duration(500)
           .attr("d", line);
@@ -293,7 +299,6 @@ const GasFeesChart: React.FC<GasFeesChartProps> = ({ gasFeeData, onZoom, onPan, 
       .selectAll("text")
       .attr("fill", "#fff");
 
-    // Add y-axis label
     g.select(".y-axis-label").remove();
     g.append("text")
       .attr("class", "y-axis-label")
@@ -319,7 +324,6 @@ const GasFeesChart: React.FC<GasFeesChartProps> = ({ gasFeeData, onZoom, onPan, 
     };
 
     updateChartSize();
-
     const resizeObserver = new ResizeObserver(() => updateChartSize());
     if (containerRef.current) resizeObserver.observe(containerRef.current);
 

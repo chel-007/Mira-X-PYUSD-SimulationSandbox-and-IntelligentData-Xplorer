@@ -44,21 +44,22 @@ export async function GET() {
 
     // New query for daily wallet growth
     const dailyWalletGrowthQuery = `
-      SELECT 
-        DATE(TIMESTAMP_MILLIS(first_tx)) AS date,
-        COUNT(DISTINCT new_wallet) AS new_wallets
+    SELECT 
+      DATE(TIMESTAMP_MILLIS(first_tx)) AS date,
+      COUNT(DISTINCT new_wallet) AS new_wallets,
+      ARRAY_AGG(DISTINCT new_wallet) AS wallets
+    FROM (
+      SELECT MIN(timestamp) AS first_tx, wallet AS new_wallet
       FROM (
-        SELECT MIN(timestamp) AS first_tx, wallet AS new_wallet
-        FROM (
-          SELECT timestamp, sender AS wallet FROM \`${projectId}.pyusd_data.transfer_logs\`
-          UNION ALL
-          SELECT timestamp, receiver AS wallet FROM \`${projectId}.pyusd_data.transfer_logs\`
-        )
-        GROUP BY wallet
+        SELECT timestamp, sender AS wallet FROM \`${projectId}.pyusd_data.transfer_logs\`
+        UNION ALL
+        SELECT timestamp, receiver AS wallet FROM \`${projectId}.pyusd_data.transfer_logs\`
       )
-      GROUP BY date
-      ORDER BY date
-    `;
+      GROUP BY wallet
+    )
+    GROUP BY date
+    ORDER BY date
+  `;
 
     const hourlyVelocityQuery = `
       SELECT 
@@ -69,7 +70,7 @@ export async function GET() {
       ORDER BY hour
     `;
     const activeWalletsQuery = `
-      SELECT COUNT(DISTINCT wallet) AS active_wallets
+      SELECT ARRAY_AGG(DISTINCT wallet) AS active_wallets
       FROM (
         SELECT sender AS wallet FROM \`${projectId}.pyusd_data.transfer_logs\`
         WHERE TIMESTAMP_MILLIS(timestamp) >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
@@ -218,6 +219,7 @@ export async function GET() {
     const dailyWalletGrowth = dailyWalletGrowthRows.map(row => ({
       date: row.date.value,
       newWallets: row.new_wallets,
+      wallets: row.wallets,
     }));
     const hourlyVelocity = hourlyVelocityRows.map(row => ({
       hour: row.hour.value,
@@ -226,7 +228,7 @@ export async function GET() {
 
     const activeWallets = activeRows[0].active_wallets;
     const totalWallets = totalRows[0].total_wallets;
-    const dormantWallets = totalWallets - activeWallets;
+    // const dormantWallets = totalWallets - activeWallets;
 
     // Process LP data
     const swapVolumeData = swapVolumeRows.map(row => ({
@@ -264,14 +266,15 @@ export async function GET() {
     //   transaction_count: parseInt(row.transaction_count),
     // }));
 
-    console.log(poolMetricsData)
+    console.log(activeWallets)
+    console.log(totalWallets)
 
     return NextResponse.json({
       dailyData,
       monthlyData,
       dailyWalletGrowth,
       activeWallets,
-      dormantWallets,
+      totalWallets,
       hourlyVelocity,
       swapVolumeData,
       poolMetricsData,
