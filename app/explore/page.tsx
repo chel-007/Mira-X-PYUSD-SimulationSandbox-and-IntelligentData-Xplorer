@@ -45,6 +45,10 @@ const Explore = () => {
   } = useData();
 
   const handleHomeClick = () => router.push("/");
+  const handleSandboxClick = () => {
+    router.push("/sandbox")
+  console.log("clicked");
+  };
 
 
   const handleToggle = (newView: "daily" | "monthly") => {
@@ -66,7 +70,7 @@ const Explore = () => {
         <button onClick={handleHomeClick} className={styles.homeButton}>
           <i className="fa-solid fa-home"></i>
         </button>
-        <button className={styles.sandboxStatus}>
+        <button onClick={handleSandboxClick} className={styles.sandboxStatus}>
           <span className={styles.pulse}></span> Sandbox is Live
         </button>
       </div>
@@ -114,7 +118,7 @@ const Explore = () => {
               <div className={styles.rightSide}>
                 <ChartWrapper
                   title="Wallet Growth Rate"
-                  loading={loading || realTimeLoading}
+                  loading={loading}
                   showExtraControls={true}
                   showChartControls={true}
                   onZoom={() => console.log("Zoom clicked")} // Temporary for testing
@@ -132,7 +136,7 @@ const Explore = () => {
                 <div className={styles.bottomPair}>
                   <ChartWrapper
                     title="Active vs. Dormant Wallets"
-                    loading={loading || realTimeLoading}
+                    loading={loading}
                     showExtraControls={false}
                     showChartControls={false}
                   >

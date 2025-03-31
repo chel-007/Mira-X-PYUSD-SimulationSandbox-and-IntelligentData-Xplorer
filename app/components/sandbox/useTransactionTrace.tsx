@@ -1,9 +1,9 @@
 // components/sandbox/useTransactionTrace.tsx
+"use client"
 import { useState } from 'react';
-require('dotenv').config();
 
-const gcpProjectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
-const gcpApiKey = process.env.GOOGLE_CLOUD_KEY;
+const gcpProjectId = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT_ID;
+const gcpApiKey = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_KEY;
 
 const RPC_URL = `https://blockchain.googleapis.com/v1/projects/${gcpProjectId}/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=${gcpApiKey}`;
 const PYUSD_ADDRESS = '0x6c3ea9036406852006290770bedfcaba0e23a0e8'.toLowerCase();

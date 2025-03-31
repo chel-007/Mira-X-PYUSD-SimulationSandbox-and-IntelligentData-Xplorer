@@ -1,9 +1,28 @@
 import { BigQuery } from '@google-cloud/bigquery';
 import { NextRequest, NextResponse } from 'next/server';
 
+const projectId = process.env.BIGQUERY_PROJECT_ID;
+let credentials;
+
+try {
+  credentials = process.env.BIGQUERY_CREDENTIALS
+    ? JSON.parse(process.env.BIGQUERY_CREDENTIALS)
+    : undefined;
+} catch (error) {
+  console.error('Error parsing BIGQUERY_CREDENTIALS:', error);
+  throw new Error('Invalid BIGQUERY_CREDENTIALS in environment variables');
+}
+
+if (!projectId) {
+  throw new Error('BIGQUERY_PROJECT_ID is not set in environment variables');
+}
+
 const bigquery = new BigQuery({
-  projectId: 'mirax-beta',
+  projectId: projectId,
+  credentials: credentials,
+  location: "US", // Adjust if needed
 });
+
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -16,13 +35,13 @@ export async function GET(request: NextRequest) {
   // Get the latest timestamp
   const latestQuery = `
     SELECT MAX(timestamp) AS latest_timestamp
-    FROM \`mirax-beta.pyusd_data.transfer_logs\`
+    FROM \`${projectId}.pyusd_data.transfer_logs\`
   `;
   const [latestRows] = await bigquery.query({ query: latestQuery });
   const latestTimestamp = latestRows[0]?.latest_timestamp || Date.now();
   const endDate = new Date(latestTimestamp);
   const startDate = new Date(endDate);
-  startDate.setDate(endDate.getDate() - 7); // 6 days back + endDate = 7 days
+  startDate.setDate(endDate.getDate() - 6); // 6 days back + endDate = 7 days
 
   // Generate 7-day range including endDate
   const dates = Array.from({ length: 7 }, (_, i) => {
@@ -40,7 +59,7 @@ export async function GET(request: NextRequest) {
       TIMESTAMP_MILLIS(CAST(timestamp AS INT64)) AS timestamp,
       sender,
       receiver
-    FROM \`mirax-beta.pyusd_data.transfer_logs\`
+    FROM \`${projectId}.pyusd_data.transfer_logs\`
     WHERE 
       (sender = LOWER(@address) OR receiver = LOWER(@address))
       AND timestamp >= @startTime

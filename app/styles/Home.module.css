@@ -9,33 +9,51 @@
 
 .appContainer {
   /* Remove absolute positioning */
-  padding: 20px 0;
-  width: 100%;
-  text-align: center;
+  padding: clamp(10px, 2vw, 20px) 0; /* Scales padding from 10px to 20px */
+  width: auto; /* Let it size naturally within topBar */
   display: flex;
   justify-content: center;
   align-items: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  flex-shrink: 0; /* Prevent shrinking */
+  flex-shrink: 1; /* Allow shrinking to fit */
+  gap: clamp(5px, 1vw, 10px); /* Responsive gap between appName and betaBadge */
 }
 
 .betaBadge {
   background-color: rgba(255, 255, 255, 0.1);
   color: white;
   border-radius: 18px;
-  padding: 5px 10px;
-  font-size: 9px;
+  padding: clamp(3px, 0.5vw, 5px) clamp(6px, 1vw, 10px); /* Scales padding */
+  font-size: clamp(7px, 1vw, 9px); /* Scales from 7px to 9px */
 }
 
 .appName {
-  margin-right: 7px;
-  font-size: 26px;
+  margin-right: clamp(4px, 1vw, 7px); /* Scales margin */
+  font-size: clamp(18px, 3vw, 26px); /* Scales from 18px to 26px */
   color: white;
   font-family: "Red Rose", serif;
 }
 
 .appName span {
   color: #7BCFFF;
+}
+
+/* Small screens adjustments */
+@media (max-width: 600px) {
+  .appContainer {
+    padding: 8px 0; /* Fixed smaller padding */
+    gap: 5px; /* Tighter gap */
+  }
+
+  .betaBadge {
+    padding: 3px 6px; /* Smaller padding */
+    font-size: 7px; /* Minimum size */
+  }
+
+  .appName {
+    margin-right: 4px; /* Minimum margin */
+    font-size: 16px; /* Minimum readable size */
+  }
 }
 
 /* Wrapper for tagline and box to center them in the remaining space */

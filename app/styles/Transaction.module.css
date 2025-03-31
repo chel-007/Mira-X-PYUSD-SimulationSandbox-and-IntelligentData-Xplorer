@@ -49,17 +49,8 @@
     flex-direction: column;
     width: 120px; /* Fixed width to keep it compact */
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    z-index: 999;
   }
-  
-  /* .optionButton {
-    background: #010214;
-    color: #7BCFFF;
-    border: none;
-    padding: 0.5rem;
-    cursor: pointer;
-    text-align: left;
-    font-size: 0.9rem;
-  } */
 
   .optionButton {
     background: #010214;
@@ -70,7 +61,7 @@
     text-align: left;
     font-size: 0.9rem;
     display: inline-block; /* Fits content width */
-    white-space: nowrap; /* Prevents text wrapping */
+    white-space: nowrap;
   }
   
   .optionButton:hover {
@@ -84,6 +75,7 @@
     border-radius: 8px;
     color: #fff;
     width: 150px;
+    z-index: 999;
   }
   
   .nodeContent {
@@ -244,4 +236,28 @@
   .tableNode td {
     padding: 10px;
     border-bottom: 1px solid #444;
+  }
+
+  .mockButtonNode {
+    padding: 10px;
+    background: rgba(0, 255, 0, 0.1);
+    border-radius: 5px;
+  }
+  
+  .mockButtonNode button {
+    margin: 0 5px;
+    padding: 5px 10px;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  
+  .miraAiPopup {
+    background: rgba(129, 132, 153, 0.15);
+    padding: 15px;
+    border-radius: 10px;
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    max-width: 300px;
   }

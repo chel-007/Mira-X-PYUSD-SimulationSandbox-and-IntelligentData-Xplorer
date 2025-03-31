@@ -5,6 +5,19 @@ import styles from "../../styles/Transaction.module.css";
 import { useReactFlow, ReactFlow, Background, Controls, Handle, Position, Node, Edge, applyNodeChanges, applyEdgeChanges, addEdge } from '@xyflow/react';
 import { useTransactionTrace } from './useTransactionTrace';
 import LatestTxScroller from './latestTxScroller';
+import { useChainId } from 'wagmi';
+import { useTransactionSimulation } from './useTransactionSimulation';
+import MiraAISuggestions from './miraAISuggestions';
+import { useData } from '../../utils/DataProvider';
+
+const gcpProjectId = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT_ID;
+const gcpApiKey = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_KEY;
+
+const MAINNET_RPC_URL = `https://blockchain.googleapis.com/v1/projects/${gcpProjectId}/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=${gcpApiKey}`;
+const SEPOLIA_RPC_URL = `https://blockchain.googleapis.com/v1/projects/${gcpProjectId}/locations/us-central1/endpoints/ethereum-sepolia/rpc?key=${gcpApiKey}`;
+
+const PYUSD_MAINNET_ADDRESS = '0x6c3ea9036406852006290770bedfcaba0e23a0e8';
+const PYUSD_SEPOLIA_ADDRESS = '0xcac524bca292aaade2df8a05cc58f0a65b1b3bb9';
 
 // Define Node Data Types
 interface TransactionNodeData {
@@ -256,40 +269,71 @@ const TableNode = ({ data }) => (
   </div>
 );
 
-// const TableNode = ({ data }) => (
-//   <div style={{ 
-//     background: 'rgba(129, 132, 153, 0.08)', 
-//     padding: '10px', 
-//     borderRadius: '5px', 
-//     color: 'rgba(255, 255, 255, 0.75)', 
-//     maxWidth: '400px',
-//   }}>
-//     <strong>{data.title}</strong><br />
-//     {data.content.map((item, idx) => (
-//       <div key={idx} style={{ marginTop: '5px', borderBottom: '1px solid #444', paddingBottom: '5px' }}>
-//         {item}
-//       </div>
-//     ))}
-//   </div>
-// );
+const MockButtonNode = ({ data, id }) => {
+  const [loading, setLoading] = useState(false);
+  const [simulated, setSimulated] = useState(null);
+  const { simulateTransfer } = useTransactionSimulation(data.rpcUrl); // Use rpcUrl from props
+  const { timeOfDay, swapVolumeData } = data.useData();
+
+  // const getInsights = (gasEstimate: any) => {
+  //   const currentHour = new Date().getHours();
+  //   const currentHourData = timeOfDay.find(d => d.hour_of_day === currentHour);
+  //   const avgGasFeeEth = currentHourData?.avg_gas_fee_eth || 0;
+  //   const historicalAvg = timeOfDay.reduce((sum, d) => sum + d.avg_gas_fee_eth, 0) / timeOfDay.length;
+  //   const isGoodTime = avgGasFeeEth < historicalAvg * 0.9;
+  //   const nextBestHour = timeOfDay
+  //     .filter(d => d.hour_of_day > currentHour)
+  //     .sort((a, b) => a.avg_gas_fee_eth - b.avg_gas_fee_eth)[0]?.hour_of_day;
+  //   const transferVelocity = swapVolumeData.reduce((sum, v) => sum + v.total_volume_usd, 0) / swapVolumeData.length;
+  //   const isHighVelocity = transferVelocity > 1000;
+
+  //   return {
+  //     gasEstimateEth: gasEstimate,
+  //     avgGasFeeEth,
+  //     isGoodTime,
+  //     nextBestHour,
+  //     isHighVelocity,
+  //   };
+  // };
+
+  // In MockButtonNode
+  const handleMock = async () => {
+    setLoading(true);
+    const { from, to, amount } = data.inputs || { from: '0x...', to: '0x...', amount: '10' }; // Fallback inputs
+    try {
+      const result = await simulateTransfer(from, to, amount, data.isMainnet);
+      console.log('Simulation Result:', result);
+      setSimulated(result);
+    } catch (error) {
+      console.error('Simulation Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className={styles.mockButtonNode}>
+      <Handle type="target" position={Position.Top} style={{ background: '#00ffcc' }} />
+      <button onClick={handleMock} disabled={loading} style={{ background: 'green' }}>
+        {loading ? <i className="fa-spin fa-spinner" /> : 'Mock'}
+      </button>
+      <Handle type="source" position={Position.Bottom} style={{ background: '#00ffcc' }} />
+    </div>
+  );
+};
 
 // Define transaction inputs mapping
 const transactionInputs = {
   Transfer: [
-    { label: 'From', xOffset: 150, yOffset: 200 },
-    { label: 'To', xOffset: 250, yOffset: 200 },
-    { label: 'Amount', xOffset: 200, yOffset: 300 },
+    { label: 'From', xOffset: 0, yOffset: 50 },
+    { label: 'To', xOffset: 400, yOffset: 50 },
+    { label: 'Amount', xOffset: 200, yOffset: 100 },
   ],
   Swap: [
     { label: 'From', xOffset: 150, yOffset: 200 },
     { label: 'To', xOffset: 250, yOffset: 200 },
     { label: 'AmountIn', xOffset: 200, yOffset: 300 },
     { label: 'AmountOut', xOffset: 200, yOffset: 400 },
-  ],
-  Bridge: [
-    { label: 'Source', xOffset: 150, yOffset: 200 },
-    { label: 'Destination', xOffset: 250, yOffset: 200 },
-    { label: 'Amount', xOffset: 200, yOffset: 300 },
   ],
 };
 
@@ -350,12 +394,53 @@ const nodeTypes = {
   inspect: InspectNode,
   table: TableNode,
   traceContainer: TraceContainerNode,
+  mockButton: MockButtonNode,
 };
 
 const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, setEdges: any, nodes: CustomNode[], edges: Edge[] }) => {
   const { trace, receipt, loading, error, fetchTrace } = useTransactionTrace();
   const [fetchingNodeId, setFetchingNodeId] = useState<string | null>(null);
   const { setCenter } = useReactFlow(); // Add this
+  const [mockInputs, setMockInputs] = useState({});
+  const { timeOfDay, swapVolumeData } = useData();
+
+
+  const chainId = useChainId(); // Add network detection
+  const isMainnet = chainId === 1;
+  const isSepolia = chainId === 11155111;
+  const rpcUrl = isMainnet ? MAINNET_RPC_URL : SEPOLIA_RPC_URL;
+
+  useEffect(() => {
+    console.log(`Wallet connected to ${isMainnet ? 'Mainnet' : 'Sepolia'}, RPC: ${rpcUrl}`);
+  }, [chainId]);
+
+  const handleInputChange = (label, value) => {
+    setMockInputs((prev) => {
+      const newInputs = { ...prev, [label]: value };
+      if (label === 'Amount' && newInputs.From && newInputs.To) {
+        const mockId = `${Date.now()}-mock`;
+        setNodes((nds) => [
+          ...nds,
+          {
+            id: mockId,
+            type: 'mockButton',
+            data: {
+              inputs: newInputs,
+              isMainnet, // Pass network info
+              rpcUrl,   // Pass RPC URL
+              useData: () => ({ timeOfDay, swapVolumeData }), // Pass DataProvider data
+            },
+            position: { x: 200, y: 500 }, // Adjust position
+          },
+        ]);
+        setEdges((eds) => [
+          ...eds,
+          { id: `e${nodes[nodes.length - 1]?.id}-${mockId}`, source: nodes[nodes.length - 1]?.id, target: mockId, animated: true },
+        ]);
+      }
+      return newInputs;
+    });
+  };
 
   const addInitialOptionsNode = (x: number, y: number) => {
     const newNode: CustomNode = {
@@ -409,7 +494,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
                           id: newId,
                           type: 'options',
                           data: {
-                            options: ['Transfer', 'Swap', 'Bridge'],
+                            options: ['Transfer', 'Swap'],
                             parentId: txNodeId,
                             onSelect: (mockId: string, option: string) => {
                               setNodes((nds: CustomNode[]) => {
@@ -437,7 +522,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
                                       id: optionId,
                                       type: 'transaction',
                                       data: { label: option, onAddNode: () => {} },
-                                      position: { x: mockNode.position.x + 200, y: mockNode.position.y + 100 },
+                                      position: { x: mockNode.position.x + 200, y: mockNode.position.y + -20 },
                                     },
                                     ...inputNodes,
                                   ];

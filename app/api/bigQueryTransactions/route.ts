@@ -266,8 +266,8 @@ export async function GET() {
     //   transaction_count: parseInt(row.transaction_count),
     // }));
 
-    console.log(activeWallets)
-    console.log(totalWallets)
+    // console.log(activeWallets)
+    // console.log(totalWallets)
 
     return NextResponse.json({
       dailyData,

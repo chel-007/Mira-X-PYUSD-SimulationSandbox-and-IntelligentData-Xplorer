@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import styles from "../styles/Sandbox.module.css";
-// import style1 from "../styles/Home.module.css";
+import style1 from "../styles/Home.module.css";
 // import style2 from "../styles/Explore.module.css";
 import { useRouter } from 'next/navigation';
 import "../globals.css";
@@ -14,20 +14,27 @@ import { ReactFlowProvider, Node, Edge } from '@xyflow/react';
 //   loading: () => <div className={styles.centerButton}><i className="fa-duotone fa-thin fa-spinner-scale"></i></div>,
 // });
 // const Wallets = dynamic(() => import('../components/sandbox/Wallets'), { ssr: false });
-// import Transactions from '../components/sandbox/Transactions';
+import Transactions from '../components/sandbox/Transactions';
 import Wallets from '../components/sandbox/Wallets';
 import { WagmiProvider } from 'wagmi';
 import { http, createConfig } from 'wagmi';
-import { mainnet } from 'wagmi/chains';
+import { mainnet, sepolia } from 'wagmi/chains';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const gcpProjectId = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT_ID;
+const gcpApiKey = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_KEY;
+
+const MAINNET_RPC_URL = `https://blockchain.googleapis.com/v1/projects/${gcpProjectId}/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=${gcpApiKey}`;
+const SEPOLIA_RPC_URL = `https://blockchain.googleapis.com/v1/projects/${gcpProjectId}/locations/us-central1/endpoints/ethereum-sepolia/rpc?key=${gcpApiKey}`;
 
 // Wagmi and Query setup
 const queryClient = new QueryClient();
-const chains = [mainnet]; // PYUSD on Ethereum Mainnet
+// const chains = [mainnet, sepolia];
 const config = createConfig({
-  chains,
+  chains: [mainnet, sepolia],
   transports: {
-    [mainnet.id]: http('https://your-gcp-rpc-endpoint'), // Replace with your GCP RPC
+    [mainnet.id]: http(MAINNET_RPC_URL),
+    [sepolia.id]: http(SEPOLIA_RPC_URL),
   },
 });
 
@@ -47,10 +54,15 @@ const Sandbox = () => {
     setEdges([]);
   };
 
+  const handleExploreClick = () => {
+    router.push("/explore")
+  console.log("clicked");
+  };
+
   const renderTabContent = () => {
     switch (activeTab) {
-      // case 'transactions':
-      //   return <Transactions setNodes={setNodes} setEdges={setEdges} nodes={nodes} edges={edges} />;
+      case 'transactions':
+        return <Transactions setNodes={setNodes} setEdges={setEdges} nodes={nodes} edges={edges} />;
       case 'wallets':
         return <Wallets />;
       case 'liquidityPools':
@@ -71,18 +83,18 @@ const Sandbox = () => {
       <QueryClientProvider client={queryClient}>
         <div className={styles.container}>
           <div className={styles.topBar}>
+          <div className={styles.appContainer}>
+              <h1 className={style1.appName}>
+                Mira <span>X</span>
+              </h1>
+              <div className={style1.betaBadge}>BETA</div>
+            </div>
             <button onClick={() => router.push('/')} className={styles.homeButton}>
               <i className="fa-solid fa-home"></i>
             </button>
-            <button className={styles.sandboxStatus}>
-              <span onClick={() => router.push('/explore')} className={styles.back}><i className="fa-thin fa-arrow-left"></i></span> Intelligent Data
+            <button onClick={handleExploreClick} className={styles.sandboxStatus}>
+              <span className={styles.back}><i className="fa-thin fa-arrow-left"></i></span> Intelligent Data
             </button>
-            <div className={styles.appContainer}>
-              <h1 className={styles.appName}>
-                Mira <span>X</span>
-              </h1>
-              <div className={styles.betaBadge}>BETA</div>
-            </div>
           </div>
 
           <div className={styles.sandboxContainer}>
