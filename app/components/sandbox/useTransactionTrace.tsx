@@ -63,5 +63,12 @@ export const useTransactionTrace = () => {
     }
   };
 
-  return { trace, receipt, loading, error, fetchTrace: fetchTraceAndReceipt };
+  const resetTrace = () => {
+    setTrace(null);
+    setReceipt(null);
+    setLoading(false);
+    setError(null);
+  };
+
+  return { trace, receipt, loading, error, resetTrace, fetchTrace: fetchTraceAndReceipt };
 };

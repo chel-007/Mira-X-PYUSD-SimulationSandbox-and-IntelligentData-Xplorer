@@ -24,7 +24,7 @@ const blockTimestampCache = new Map();
 
 // Batch writing configuration
 const BATCH_SIZE = 10;
-const WRITE_INTERVAL_MS = 50000; // 50 seconds
+const WRITE_INTERVAL_MS = 5000; // 50 seconds
 let pendingWrites = [];
 let writeTimeout = null;
 
@@ -71,9 +71,14 @@ async function getBlockTimestamp(blockNumberHex) {
     return blockTimestampCache.get(blockNumberHex);
   }
   const block = await fetchWithRetry("eth_getBlockByNumber", [blockNumberHex, false]);
+  if (!block || !block.timestamp) {
+    console.warn(`Block ${blockNumberHex} missing timestamp, using current time`);
+    const timestampMs = Date.now();
+    blockTimestampCache.set(blockNumberHex, timestampMs);
+    return timestampMs;
+  }
   const timestampMs = parseInt(block.timestamp, 16) * 1000;
   blockTimestampCache.set(blockNumberHex, timestampMs);
-  // Limit cache size to prevent memory issues
   if (blockTimestampCache.size > 1000) {
     const oldestKey = blockTimestampCache.keys().next().value;
     blockTimestampCache.delete(oldestKey);
@@ -123,6 +128,12 @@ async function processEvent(logData, eventType) {
   // Fetch additional transaction details
   const { input, gasPrice, gasUsed, status, fromAddress, toAddress } = await getTransactionDetails(txHash);
   const timestampMs = await getBlockTimestamp(blockNumberHex);
+  if (typeof timestampMs !== 'number' || isNaN(timestampMs)) {
+    console.error(`Invalid timestamp for tx ${txHash}, using current time`);
+    timestampMs = Date.now();
+  }
+
+  const timestampSec = Math.floor(timestampMs / 1000);
 
   let args = {};
   if (eventType === 'Transfer') {
@@ -158,7 +169,7 @@ async function processEvent(logData, eventType) {
 
   const eventData = {
     block_number: blockNumber,
-    block_timestamp: timestampMs,
+    block_timestamp: timestampSec, // Seconds for lp_and_transfers
     tx_hash: txHash,
     log_index: logIndex,
     address,

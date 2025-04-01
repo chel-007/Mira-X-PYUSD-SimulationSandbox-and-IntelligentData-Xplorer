@@ -140,7 +140,8 @@ const Explore = () => {
                     showExtraControls={false}
                     showChartControls={false}
                   >
-                    <ActiveWalletsChart activeWallets={activeWallets} dormantWallets={dormantWallets} loading={loading} />
+                    <ActiveWalletsChart
+                    activeWallets={activeWallets} dormantWallets={dormantWallets} loading={loading} />
                   </ChartWrapper>
                   <ChartWrapper
                     title="Velocity of Transfers"

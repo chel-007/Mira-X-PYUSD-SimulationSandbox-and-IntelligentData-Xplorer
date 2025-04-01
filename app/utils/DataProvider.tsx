@@ -112,6 +112,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const prevLpCountRef = useRef<number>(0);
   const prevTransferCountRef = useRef<number>(0);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const historicalDataRef = useRef(null);
 
   const fetchBigQueryData = async () => {
     const response = await fetch("/api/bigQueryTransactions");
@@ -185,59 +186,59 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // console.log("BigQuery Wallet Growth Data:", dailyWalletGrowth);
 
     // Process Gas Fees Chart data (historical)
-    const gasComparisonData = bigQueryData.gasComparisonData.map((row: any) => {
-      const avgGasFeeEth = parseFloat(row.avg_gas_fee_eth);
-      return {
-        event_date: row.event_date,
-        event_type: row.event_type,
-        avg_gas_fee_eth: avgGasFeeEth,
-        avg_gas_fee_usd: ethPrice ? avgGasFeeEth * ethPrice : 0,
-        transaction_count: parseInt(row.transaction_count),
-      };
-    });
+    // const gasComparisonData = bigQueryData.gasComparisonData.map((row: any) => {
+    //   const avgGasFeeEth = parseFloat(row.avg_gas_fee_eth);
+    //   return {
+    //     event_date: row.event_date,
+    //     event_type: row.event_type,
+    //     avg_gas_fee_eth: avgGasFeeEth,
+    //     avg_gas_fee_usd: ethPrice ? avgGasFeeEth * ethPrice : 0,
+    //     transaction_count: parseInt(row.transaction_count),
+    //   };
+    // });
 
     // Process Time of Day Chart data (historical)
-    const timeOfDayData = bigQueryData.timeOfDayData.map((row: any) => {
-      const avgGasFeeEth = parseFloat(row.avg_gas_fee_eth);
-      return {
-        event_date: row.event_date,
-        hour_of_day: parseInt(row.hour_of_day),
-        avg_gas_fee_eth: avgGasFeeEth,
-        avg_gas_fee_usd: ethPrice ? avgGasFeeEth * ethPrice : 0,
-        transaction_count: parseInt(row.transaction_count),
-      };
-    });
+    // const timeOfDayData = bigQueryData.timeOfDayData.map((row: any) => {
+    //   const avgGasFeeEth = parseFloat(row.avg_gas_fee_eth);
+    //   return {
+    //     event_date: row.event_date,
+    //     hour_of_day: parseInt(row.hour_of_day),
+    //     avg_gas_fee_eth: avgGasFeeEth,
+    //     avg_gas_fee_usd: ethPrice ? avgGasFeeEth * ethPrice : 0,
+    //     transaction_count: parseInt(row.transaction_count),
+    //   };
+    // });
 
-    // Process Swap Volume Chart data (historical)
-    const swapVolumeData = Array.isArray(bigQueryData.swapVolumeData)
-      ? bigQueryData.swapVolumeData.map((row: any) => ({
-          pool_address: row.pool_address.toLowerCase(),
-          date: row.date,
-          total_volume_usd: parseFloat(row.total_volume_usd),
-        }))
-      : [];
+    // // Process Swap Volume Chart data (historical)
+    // const swapVolumeData = Array.isArray(bigQueryData.swapVolumeData)
+    //   ? bigQueryData.swapVolumeData.map((row: any) => ({
+    //       pool_address: row.pool_address.toLowerCase(),
+    //       date: row.date,
+    //       total_volume_usd: parseFloat(row.total_volume_usd),
+    //     }))
+    //   : [];
 
     // Process Pool Metrics Chart data (historical)
-    let poolData: PoolMetricsData[] = bigQueryData.poolMetricsData.map((row: any) => ({
-      pool_address: row.pool_address.toLowerCase(),
-      median_gas_fee_eth: parseFloat(row.median_gas_fee_eth),
-      swap_count: parseInt(row.swap_count),
-      total_volume_usd: parseFloat(row.total_volume_usd),
-      tvl_usd: 0, // Will be updated with Curve API data
-      apr: 0, // Will be updated with Curve API data
-    }));
+    // let poolData: PoolMetricsData[] = bigQueryData.poolMetricsData.map((row: any) => ({
+    //   pool_address: row.pool_address.toLowerCase(),
+    //   median_gas_fee_eth: parseFloat(row.median_gas_fee_eth),
+    //   swap_count: parseInt(row.swap_count),
+    //   total_volume_usd: parseFloat(row.total_volume_usd),
+    //   tvl_usd: 0, // Will be updated with Curve API data
+    //   apr: 0, // Will be updated with Curve API data
+    // }));
 
     // Fetch Curve API data for TVL and APR
-    const curvePoolsData = await fetchCurveData();
-    poolData = poolData.map(pool => {
-      const poolAddress = pool.pool_address.toLowerCase();
-      const curveData = curvePoolsData[poolAddress] || { tvl: 0, baseApy: 0 };
-      return {
-        ...pool,
-        tvl_usd: curveData.tvl,
-        apr: curveData.baseApy,
-      };
-    });
+    // const curvePoolsData = await fetchCurveData();
+    // poolData = poolData.map(pool => {
+    //   const poolAddress = pool.pool_address.toLowerCase();
+    //   const curveData = curvePoolsData[poolAddress] || { tvl: 0, baseApy: 0 };
+    //   return {
+    //     ...pool,
+    //     tvl_usd: curveData.tvl,
+    //     apr: curveData.baseApy,
+    //   };
+    // });
 
     return {
       dailyData,
@@ -247,11 +248,37 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       totalWallets: bigQueryData.totalWallets,
     //   dormantWallets: bigQueryData.dormantWallets,
       hourlyVelocity,
-      gasComparisonData,
-      timeOfDayData,
-      swapVolumeData,
-      poolMetricsData: poolData,
+      // gasComparisonData,
+      // timeOfDayData,
+      // swapVolumeData,
+      // poolMetricsData: poolData,
     };
+  };
+
+  // Helper function to refresh BigQuery data and update states
+  const refreshBigQueryData = async () => {
+    const bigQueryData = await fetchBigQueryData();
+    if (!bigQueryData) return null;
+    const historicalData = await processBigQueryData(bigQueryData);
+
+    historicalDataRef.current = historicalData;
+
+    setHistoricalDailyVolume(historicalData.dailyData);
+    setHistoricalMonthlyVolume(historicalData.monthlyData);
+    setHistoricalWalletGrowthData(historicalData.dailyWalletGrowth);
+    setHistoricalActiveWallets(historicalData.activeWallets);
+    setHistoricalHourlyVelocity(historicalData.hourlyVelocity);
+    // setHistoricalGasFeeData(historicalData.gasComparisonData);
+    // setHistoricalTimeOfDay(historicalData.timeOfDayData);
+    // setHistoricalSwapVolumeData(historicalData.swapVolumeData);
+    // setHistoricalPoolMetricsData(historicalData.poolMetricsData);
+
+const activeWalletSet = new Set(historicalData.activeWallets);
+  setHistoricalActiveWalletSet(activeWalletSet);
+  setHistoricalActiveWallets(activeWalletSet.size); // Still a number here
+  setHistoricalDormantWallets(historicalData.totalWallets - activeWalletSet.size);
+
+    return historicalData; // Return for potential use (e.g., totalWallets)
   };
 
   // Fetch historical data once on mount
@@ -268,43 +295,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         }
 
-        const bigQueryData = await fetchBigQueryData();
-        if (!bigQueryData) {
+        setLoading(true);
+        const historicalData = await refreshBigQueryData();
+        if (!historicalData) {
           setLoading(false);
           setSwapVolumeData([]);
           return;
         }
 
-        const historicalData = await processBigQueryData(bigQueryData);
-        // console.log("Historical Data from processBigQueryData:", historicalData);
-
-        // Set historical data
-        setHistoricalDailyVolume(historicalData.dailyData);
-        setHistoricalMonthlyVolume(historicalData.monthlyData);
-        setHistoricalWalletGrowthData(historicalData.dailyWalletGrowth);
-        // console.log("Set historicalWalletGrowthData:", historicalData.dailyWalletGrowth);
-        setHistoricalActiveWallets(historicalData.activeWallets);
-        setHistoricalHourlyVelocity(historicalData.hourlyVelocity);
-        setHistoricalHourlyVelocity(historicalData.hourlyVelocity);
-        setHistoricalGasFeeData(historicalData.gasComparisonData);
-        setHistoricalTimeOfDay(historicalData.timeOfDayData);
-        setHistoricalSwapVolumeData(historicalData.swapVolumeData);
-        setHistoricalPoolMetricsData(historicalData.poolMetricsData);
-
-        // Convert activeWallets array to a Set
-        // Convert activeWallets array to a Set
-      const historicalActiveWalletSetLocal = new Set(historicalData.activeWallets);
-      setHistoricalActiveWalletSet(historicalActiveWalletSetLocal);
-      setHistoricalActiveWallets(historicalActiveWalletSetLocal.size);
-      setHistoricalDormantWallets(historicalData.totalWallets - historicalActiveWalletSetLocal.size);
-
-      // Store totalWallets for later use
-      const totalHistoricalWallets = historicalData.totalWallets;
-    //   console.log("Historical Total Wallets:", totalHistoricalWallets);
-    //   console.log("Historical Active Wallets:", historicalActiveWalletSetLocal.size);
-    //   console.log("Historical Dormant Wallets:", historicalData.totalWallets - historicalActiveWalletSetLocal.size);
-
-    //     console.log("Historical Wallet Growth:", historicalWalletGrowthData);
+        const totalHistoricalWallets = historicalData.totalWallets;
        
 
           // Subscribe to transfer_transactions for real-time updates
@@ -318,12 +317,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const oneHourAgo = now.getTime() - 3600000;
         const thirtyDaysAgo = now.getTime() - 30 * 24 * 60 * 60 * 1000;
 
+        // Check if collection is empty to trigger BigQuery refresh
+        if (snapshot.size === 0 && !refreshTimeoutRef.current) {
+          console.log("transfer_transactions is empty, scheduling BigQuery refresh...");
+          refreshTimeoutRef.current = setTimeout(async () => {
+            console.log("Refreshing BigQuery data after 3 seconds...");
+            await refreshBigQueryData();
+            refreshTimeoutRef.current = null;
+          }, 3000);
+        }
+
+        prevTransferCountRef.current = snapshot.size;
+
+        console.log("prevtransfercountref", prevTransferCountRef.current)
+
         // Update transaction velocity
-        // Update transaction velocity
-    // Get the current hour truncated to match BigQuery's format (e.g., "2025-03-30 14:00:00 UTC")
+        // Get the current hour truncated to match BigQuery's format (e.g., "2025-03-30 14:00:00 UTC")
         const currentHour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours()).toISOString();
-        const historicalHour = historicalHourlyVelocity.find(row => row.hour === currentHour);
+        const historicalHour = historicalDataRef.current?.hourlyVelocity.find(row => row.hour === currentHour);
         const historicalTxCount = historicalHour ? historicalHour.txPerHour : 0;
+        console.log("velocity now", currentHour)
+        console.log("velocityhour", historicalHour)
+        console.log("velocityhistory", historicalTxCount)
+        console.log("main velocity", historicalData.hourlyVelocity)
 
         const recentTx = transactions.filter(t => new Date(t.timestamp).getTime() >= oneHourAgo);
         const realTimeTxCount = recentTx.length;
@@ -367,7 +383,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setRealTimeMonthlyVolume(formattedMonthlyData);
 
         // Update Wallet Growth (real-time)
-        const seenWallets = new Set(historicalData.dailyWalletGrowth.flatMap((row: any) => row.wallets || []));
+        const seenWallets = new Set(historicalDataRef.current?.dailyWalletGrowth.flatMap((row: any) => row.wallets || []));
         // console.log("seenwallets", historicalWalletGrowthData)
         const realTimeNewWallets = transactions.reduce((acc: Record<string, number>, t: any) => {
         const date = new Date(t.timestamp).toISOString().split("T")[0];
@@ -392,7 +408,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Update Active and Dormant Wallets (real-time)
         // Update Active and Dormant Wallets (real-time)
-          const allHistoricalWallets = new Set(historicalData.dailyWalletGrowth.flatMap((row: any) => row.wallets || []));
+          const allHistoricalWallets = new Set(historicalDataRef.current?.dailyWalletGrowth.flatMap((row: any) => row.wallets || []));
         //   console.log("allhistoricalwallets", allHistoricalWallets);
           const allRealTimeWallets = new Set(transactions.flatMap((t: any) => [t.sender, t.receiver]));
         //   console.log("allRealTimeWallets", allRealTimeWallets);
@@ -403,7 +419,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const totalWalletsBase = totalHistoricalWallets;
           const totalWallets = Math.max(totalWalletsBase, allWallets.size); // Adjust if real-time adds new wallets
 
-          const activeSet = new Set(historicalData.activeWallets);
+          const activeSet = new Set(historicalDataRef.current?.activeWallets);
         //   console.log(activeSet)
           transactions.forEach((t: any) => {
             if (new Date(t.timestamp).getTime() >= thirtyDaysAgo) {
@@ -431,7 +447,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    return () => unsubscribeTransfers();
+    return () => {
+      unsubscribeTransfers();
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+        refreshTimeoutRef.current = null;
+      }
+    };
 
       } catch (error) {
         console.error("Error loading historical data:", error);
@@ -550,6 +572,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const now = new Date();
         const thirtyDaysAgo = now.getTime() - 30 * 24 * 60 * 60 * 1000;
+
+        if (snapshot.size === 0 && !refreshTimeoutRef.current) {
+          console.log("transfer_transactions is empty, scheduling BigQuery refresh...");
+          refreshTimeoutRef.current = setTimeout(async () => {
+            console.log("Refreshing BigQuery data after 3 seconds...");
+            await refreshBigQueryData();
+            refreshTimeoutRef.current = null;
+          }, 3000);
+        }
+
 
         // Update Gas Fees Chart (real-time)
         // Update Gas Fees Chart (real-time)

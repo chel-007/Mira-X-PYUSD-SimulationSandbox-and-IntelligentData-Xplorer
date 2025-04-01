@@ -189,10 +189,10 @@ export async function GET() {
       [hourlyVelocityRows],
       [activeRows],
       [totalRows],
-      [swapVolumeRows],
-      [poolMetricsRows],
-      [gasComparisonRows],
-      [timeOfDayRows],
+      // [swapVolumeRows],
+      // [poolMetricsRows],
+      // [gasComparisonRows],
+      // [timeOfDayRows],
       // [gasFeeVolatilityRows]
     ] = await Promise.all([
       bigquery.query({ query: dailyQuery }),
@@ -201,10 +201,10 @@ export async function GET() {
       bigquery.query({ query: hourlyVelocityQuery }),
       bigquery.query({ query: activeWalletsQuery }),
       bigquery.query({ query: totalWalletsQuery }),
-      bigquery.query({ query: swapVolumeQuery }),
-      bigquery.query({ query: poolMetricsQuery }),
-      bigquery.query({ query: gasComparisonQuery }),
-      bigquery.query({ query: timeOfDayQuery }),
+      // bigquery.query({ query: swapVolumeQuery }),
+      // bigquery.query({ query: poolMetricsQuery }),
+      // bigquery.query({ query: gasComparisonQuery }),
+      // bigquery.query({ query: timeOfDayQuery }),
       // bigquery.query({ query: gasFeeVolatilityQuery}),
     ]);
 
@@ -231,33 +231,33 @@ export async function GET() {
     // const dormantWallets = totalWallets - activeWallets;
 
     // Process LP data
-    const swapVolumeData = swapVolumeRows.map(row => ({
-      pool_address: row.pool_address,
-      date: row.date.value,
-      total_volume_usd: Number(Number(row.total_volume_usd).toFixed(2)),
-    }));
+    // const swapVolumeData = swapVolumeRows.map(row => ({
+    //   pool_address: row.pool_address,
+    //   date: row.date.value,
+    //   total_volume_usd: Number(Number(row.total_volume_usd).toFixed(2)),
+    // }));
 
-    const poolMetricsData = poolMetricsRows.map(row => ({
-      pool_address: row.pool_address,
-      avg_gas_fee_eth: Number(row.avg_gas_fee_eth.toFixed(6)),
-      median_gas_fee_eth: Number(row.median_gas_fee_eth.toFixed(6)),
-      swap_count: Number(row.swap_count),
-      total_volume_usd: Number(row.total_volume_usd.toFixed(2)),
-    }));
+    // const poolMetricsData = poolMetricsRows.map(row => ({
+    //   pool_address: row.pool_address,
+    //   avg_gas_fee_eth: Number(row.avg_gas_fee_eth.toFixed(6)),
+    //   median_gas_fee_eth: Number(row.median_gas_fee_eth.toFixed(6)),
+    //   swap_count: Number(row.swap_count),
+    //   total_volume_usd: Number(row.total_volume_usd.toFixed(2)),
+    // }));
 
-    const gasComparisonData = gasComparisonRows.map(row => ({
-      event_date: row.event_date.value,
-      event_type: row.event_type,
-      avg_gas_fee_eth: parseFloat(row.avg_gas_fee_eth),
-      transaction_count: parseInt(row.transaction_count),
-    }));
+    // const gasComparisonData = gasComparisonRows.map(row => ({
+    //   event_date: row.event_date.value,
+    //   event_type: row.event_type,
+    //   avg_gas_fee_eth: parseFloat(row.avg_gas_fee_eth),
+    //   transaction_count: parseInt(row.transaction_count),
+    // }));
 
-    const timeOfDayData = timeOfDayRows.map(row => ({
-      event_date: row.event_date.value,
-      hour_of_day: parseInt(row.hour_of_day),
-      avg_gas_fee_eth: parseFloat(row.avg_gas_fee_eth),
-      transaction_count: parseInt(row.transaction_count),
-    }));
+    // const timeOfDayData = timeOfDayRows.map(row => ({
+    //   event_date: row.event_date.value,
+    //   hour_of_day: parseInt(row.hour_of_day),
+    //   avg_gas_fee_eth: parseFloat(row.avg_gas_fee_eth),
+    //   transaction_count: parseInt(row.transaction_count),
+    // }));
 
     // const gasFeeVolatilityData = gasFeeVolatilityRows.map(row => ({
     //   event_date: row.event_date.value,
@@ -266,8 +266,8 @@ export async function GET() {
     //   transaction_count: parseInt(row.transaction_count),
     // }));
 
-    // console.log(activeWallets)
-    // console.log(totalWallets)
+    console.log(activeWallets)
+    console.log(totalWallets)
 
     return NextResponse.json({
       dailyData,
@@ -276,10 +276,10 @@ export async function GET() {
       activeWallets,
       totalWallets,
       hourlyVelocity,
-      swapVolumeData,
-      poolMetricsData,
-      gasComparisonData,
-      timeOfDayData,
+      // swapVolumeData,
+      // poolMetricsData,
+      // gasComparisonData,
+      // timeOfDayData,
       // gasFeeVolatilityData
     });
 

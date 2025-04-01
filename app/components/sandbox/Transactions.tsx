@@ -1,14 +1,16 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from "../../styles/Transaction.module.css";
 import { useReactFlow, ReactFlow, Background, Controls, Handle, Position, Node, Edge, applyNodeChanges, applyEdgeChanges, addEdge } from '@xyflow/react';
 import { useTransactionTrace } from './useTransactionTrace';
 import LatestTxScroller from './latestTxScroller';
-import { useChainId } from 'wagmi';
+import { useChainId, useAccount } from 'wagmi';
 import { useTransactionSimulation } from './useTransactionSimulation';
 import MiraAISuggestions from './miraAISuggestions';
 import { useData } from '../../utils/DataProvider';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css'; // Import default styles
 
 const gcpProjectId = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT_ID;
 const gcpApiKey = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_KEY;
@@ -110,13 +112,6 @@ const OptionsNode = ({ id, data }: { id: string; data: OptionsNodeData }) => (
   </div>
 );
 
-const InputNode = ({ data, id }: { data: TextInputNodeData; id: string }) => (
-  <div className={styles.textInputNode}>
-    <Handle type="target" position={Position.Top} style={{ background: '#00ffcc' }} />
-    <input type="text" placeholder={data.label} />
-    <Handle type="source" position={Position.Bottom} style={{ background: '#00ffcc' }} />
-  </div>
-);
 
 const CallNode = ({ data }) => (
   <div style={{ background: '#7BCFFF', padding: '10px', borderRadius: '5px', color: '#fff', position: 'relative' }}>
@@ -269,59 +264,6 @@ const TableNode = ({ data }) => (
   </div>
 );
 
-const MockButtonNode = ({ data, id }) => {
-  const [loading, setLoading] = useState(false);
-  const [simulated, setSimulated] = useState(null);
-  const { simulateTransfer } = useTransactionSimulation(data.rpcUrl); // Use rpcUrl from props
-  const { timeOfDay, swapVolumeData } = data.useData();
-
-  // const getInsights = (gasEstimate: any) => {
-  //   const currentHour = new Date().getHours();
-  //   const currentHourData = timeOfDay.find(d => d.hour_of_day === currentHour);
-  //   const avgGasFeeEth = currentHourData?.avg_gas_fee_eth || 0;
-  //   const historicalAvg = timeOfDay.reduce((sum, d) => sum + d.avg_gas_fee_eth, 0) / timeOfDay.length;
-  //   const isGoodTime = avgGasFeeEth < historicalAvg * 0.9;
-  //   const nextBestHour = timeOfDay
-  //     .filter(d => d.hour_of_day > currentHour)
-  //     .sort((a, b) => a.avg_gas_fee_eth - b.avg_gas_fee_eth)[0]?.hour_of_day;
-  //   const transferVelocity = swapVolumeData.reduce((sum, v) => sum + v.total_volume_usd, 0) / swapVolumeData.length;
-  //   const isHighVelocity = transferVelocity > 1000;
-
-  //   return {
-  //     gasEstimateEth: gasEstimate,
-  //     avgGasFeeEth,
-  //     isGoodTime,
-  //     nextBestHour,
-  //     isHighVelocity,
-  //   };
-  // };
-
-  // In MockButtonNode
-  const handleMock = async () => {
-    setLoading(true);
-    const { from, to, amount } = data.inputs || { from: '0x...', to: '0x...', amount: '10' }; // Fallback inputs
-    try {
-      const result = await simulateTransfer(from, to, amount, data.isMainnet);
-      console.log('Simulation Result:', result);
-      setSimulated(result);
-    } catch (error) {
-      console.error('Simulation Error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className={styles.mockButtonNode}>
-      <Handle type="target" position={Position.Top} style={{ background: '#00ffcc' }} />
-      <button onClick={handleMock} disabled={loading} style={{ background: 'green' }}>
-        {loading ? <i className="fa-spin fa-spinner" /> : 'Mock'}
-      </button>
-      <Handle type="source" position={Position.Bottom} style={{ background: '#00ffcc' }} />
-    </div>
-  );
-};
-
 // Define transaction inputs mapping
 const transactionInputs = {
   Transfer: [
@@ -336,6 +278,8 @@ const transactionInputs = {
     { label: 'AmountOut', xOffset: 200, yOffset: 400 },
   ],
 };
+
+
 
 // Parse trace data
 const parseTrace = (trace, parentId, position, contractNames = {}) => {
@@ -381,6 +325,157 @@ const parseTrace = (trace, parentId, position, contractNames = {}) => {
   return { nodes, edges, callCount: nodes.length, errorCount: nodes.filter(n => n.type === 'errorNode').length };
 };
 
+
+const InputNode = ({ data, id }) => {
+  const [value, setValue] = useState(data.value || '');
+  const [lastAlertTime, setLastAlertTime] = useState(0);
+  const inputRef = useRef(null);
+
+  // Sync local value with data.value whenever it changes
+  useEffect(() => {
+    setValue(data.value || '');
+  }, [data.value]);
+
+  const handleChange = (e) => {
+    if (!data.isWalletConnected) {
+      const now = Date.now();
+      if (now - lastAlertTime > 1000) {
+        console.log("Toast triggered: Please connect your wallet first!");
+        toast.error("Please connect your wallet first!", {
+          position: "top-right",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+        setLastAlertTime(now);
+        inputRef.current.blur();
+      }
+      return;
+    }
+    setValue(e.target.value);
+    if (data.onChange) {
+      data.onChange(data.label, e.target.value, id);
+    }
+  };
+
+  const handleFocus = (e) => {
+    if (!data.isWalletConnected) {
+      const now = Date.now();
+      if (now - lastAlertTime > 1000) {
+        console.log("Toast triggered: Please connect your wallet first!");
+        toast.error("Please connect your wallet first!", {
+          position: "top-right",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+        setLastAlertTime(now);
+        inputRef.current.blur();
+      }
+      return;
+    }
+    if (data.onFocus) {
+      data.onFocus(data.label, id);
+    }
+  };
+
+  return (
+    <div className={styles.textInputNode}>
+      <Handle type="target" position={Position.Top} style={{ background: '#00ffcc' }} />
+      <input
+        ref={inputRef}
+        type="text"
+        placeholder={data.label}
+        value={value}
+        onChange={handleChange}
+        onFocus={handleFocus}
+        className={!data.isWalletConnected ? styles.disabledInput : ''}
+        title={!data.isWalletConnected ? "Please connect your wallet first" : ""}
+      />
+      <Handle type="source" position={Position.Bottom} style={{ background: '#00ffcc' }} />
+    </div>
+  );
+};
+
+const MockButtonNode = ({ data, id }) => {
+  const [loading, setLoading] = useState(false);
+  const [simulated, setSimulated] = useState(null);
+  const { simulateTransfer } = useTransactionSimulation(data.rpcUrl);
+  const { timeOfDay, swapVolumeData } = data.useData();
+
+  const handleMock = async () => {
+    setLoading(true);
+    const { From, To, Amount } = data.inputs || {};
+    console.log('Inputs before simulation:', { From, To, Amount });
+    console.log(data)
+    if (!From || !To || !Amount) {
+      setSimulated({ error: 'Missing required fields' });
+      setLoading(false);
+      return;
+    }
+    try {
+      const result = await simulateTransfer(From, To, String(Amount), data.isMainnet); // Ensure string
+      console.log('Simulation Result:', result);
+      setSimulated(result);
+    } catch (error) {
+      console.error('Simulation Error:', error);
+      setSimulated({ error: error.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getInsights = (gasEstimate) => {
+    const currentHour = new Date().getHours();
+    const currentHourData = timeOfDay.find(d => d.hour_of_day === currentHour);
+    const avgGasFeeEth = currentHourData?.avg_gas_fee_eth || 0;
+    const historicalAvg = timeOfDay.reduce((sum, d) => sum + d.avg_gas_fee_eth, 0) / timeOfDay.length;
+    const isGoodTime = avgGasFeeEth < historicalAvg * 0.9;
+    const nextBestHour = timeOfDay
+      .filter(d => d.hour_of_day > currentHour)
+      .sort((a, b) => a.avg_gas_fee_eth - b.avg_gas_fee_eth)[0]?.hour_of_day;
+
+    return {
+      gasEstimateEth: gasEstimate,
+      isGoodTime,
+      nextBestHour: nextBestHour ? `Wait until ${nextBestHour}:00` : 'No better time soon',
+    };
+  };
+
+  return (
+    <div className={styles.mockButtonNode}>
+      <Handle type="target" position={Position.Top} style={{ background: '#00ffcc' }} />
+      <button onClick={handleMock} disabled={loading} style={{ background: 'green' }}>
+        {loading ? <i className="fa-spin fa-spinner" /> : 'Simulate'}
+      </button>
+      <Handle type="source" position={Position.Bottom} style={{ background: '#00ffcc' }} />
+      {simulated && (
+        <div style={{ marginTop: '10px', textAlign: 'center' }}>
+          <p>Gas Estimate: {simulated.gasEstimate} wei</p>
+          {simulated.error ? (
+            <p>Error: {simulated.error}</p>
+          ) : (
+            <>
+              {(() => {
+                const insights = getInsights(simulated.gasEstimate);
+                return (
+                  <>
+                    <p>{insights.isGoodTime ? 'Good time to send!' : insights.nextBestHour}</p>
+                  </>
+                );
+              })()}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Define nodeTypes
 const nodeTypes = {
   transaction: TransactionNode,
@@ -398,58 +493,147 @@ const nodeTypes = {
 };
 
 const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, setEdges: any, nodes: CustomNode[], edges: Edge[] }) => {
-  const { trace, receipt, loading, error, fetchTrace } = useTransactionTrace();
-  const [fetchingNodeId, setFetchingNodeId] = useState<string | null>(null);
-  const { setCenter } = useReactFlow(); // Add this
-  const [mockInputs, setMockInputs] = useState({});
+  const { trace, receipt, loading, error, resetTrace, fetchTrace } = useTransactionTrace();
+  console.log('useTransactionTrace output:', { trace, receipt, loading, error, resetTrace, fetchTrace });
+  const [fetchingNodeId, setFetchingNodeId] = useState(null);
+  const { setCenter } = useReactFlow();
+  const chainId = useChainId();
+  const { address } = useAccount();
   const { timeOfDay, swapVolumeData } = useData();
+  const [mockInputs, setMockInputs] = useState({});
+  const [amountNodeId, setAmountNodeId] = useState(null); // Track Amount node ID
 
-
-  const chainId = useChainId(); // Add network detection
   const isMainnet = chainId === 1;
   const isSepolia = chainId === 11155111;
   const rpcUrl = isMainnet ? MAINNET_RPC_URL : SEPOLIA_RPC_URL;
+  const isWalletConnected = !!address; // True if address is defined, false if undefined
 
   useEffect(() => {
-    console.log(`Wallet connected to ${isMainnet ? 'Mainnet' : 'Sepolia'}, RPC: ${rpcUrl}`);
+    console.log(`Wallet connected to ${isMainnet ? 'Mainnet' : isSepolia ? 'Sepolia' : 'Unknown'}, RPC: ${rpcUrl}`);
+    console.log("address", address)
   }, [chainId]);
 
-  const handleInputChange = (label, value) => {
+  // Validate Ethereum address
+  const isValidEthAddress = (addr) => /^0x[a-fA-F0-9]{40}$/.test(addr);
+
+
+  const MOCK_BUTTON_Y_OFFSET = 150;
+
+  const handleInputChange = (label, value, nodeId) => {
+    if (!isWalletConnected) {
+      return; // Don’t update mockInputs or nodes
+    }
     setMockInputs((prev) => {
       const newInputs = { ...prev, [label]: value };
-      if (label === 'Amount' && newInputs.From && newInputs.To) {
-        const mockId = `${Date.now()}-mock`;
-        setNodes((nds) => [
-          ...nds,
-          {
-            id: mockId,
-            type: 'mockButton',
-            data: {
-              inputs: newInputs,
-              isMainnet, // Pass network info
-              rpcUrl,   // Pass RPC URL
-              useData: () => ({ timeOfDay, swapVolumeData }), // Pass DataProvider data
-            },
-            position: { x: 200, y: 500 }, // Adjust position
-          },
-        ]);
-        setEdges((eds) => [
-          ...eds,
-          { id: `e${nodes[nodes.length - 1]?.id}-${mockId}`, source: nodes[nodes.length - 1]?.id, target: mockId, animated: true },
-        ]);
+      console.log('mockInputs updated:', newInputs);
+      if (label === 'Amount') {
+        setAmountNodeId(nodeId);
       }
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.data.label === label ? { ...node, data: { ...node.data, value } } : node
+        )
+      );
       return newInputs;
     });
   };
 
-  const addInitialOptionsNode = (x: number, y: number) => {
-    const newNode: CustomNode = {
+  const handleFocus = (label, nodeId) => {
+    if (!isWalletConnected) {
+      return;
+    }
+    if (label === 'From' && address) {
+      console.log("from entered with wallet address:", address);
+      setMockInputs((prev) => ({ ...prev, From: address }));
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === nodeId ? { ...node, data: { ...node.data, value: address } } : node
+        )
+      );
+    }
+  };
+
+  useEffect(() => {
+    const existingMockNode = nodes.find((n) => n.type === 'mockButton');
+    const amountNode = amountNodeId ? nodes.find((n) => n.id === amountNodeId) : null;
+    const hasAllFields = !!(mockInputs.From && mockInputs.To && mockInputs.Amount);
+    const isValidInputs = hasAllFields &&
+      isValidEthAddress(mockInputs.From) &&
+      isValidEthAddress(mockInputs.To) &&
+      mockInputs.From !== mockInputs.To &&
+      parseFloat(mockInputs.Amount) > 0;
+
+    console.log('useEffect - mockInputs:', mockInputs);
+    console.log('useEffect - hasAllFields:', hasAllFields);
+    console.log('useEffect - isValidInputs:', isValidInputs);
+
+    if (!isWalletConnected) {
+      console.log('Wallet not connected, skipping MockButtonNode logic');
+      if (existingMockNode) {
+        setNodes((nds) => nds.filter((n) => n.id !== existingMockNode.id));
+        setEdges((eds) => eds.filter((e) => e.target !== existingMockNode.id));
+      }
+      return;
+    }
+
+    if (existingMockNode && !isValidInputs) {
+      console.log('Removing MockButtonNode due to invalid inputs');
+      setNodes((nds) => nds.filter((n) => n.id !== existingMockNode.id));
+      setEdges((eds) => eds.filter((e) => e.target !== existingMockNode.id));
+      return;
+    }
+
+    if (isValidInputs && amountNode) {
+      const mockId = existingMockNode ? existingMockNode.id : `${Date.now()}-mock`;
+      const mockPosition = {
+        x: amountNode.position.x,
+        y: amountNode.position.y + MOCK_BUTTON_Y_OFFSET,
+      };
+
+      console.log('Adding/updating MockButtonNode with inputs:', mockInputs);
+      setNodes((nds) => {
+        const updatedNodes = existingMockNode
+          ? nds.map((n) =>
+              n.id === mockId
+                ? { ...n, data: { ...n.data, inputs: mockInputs }, position: mockPosition }
+                : n
+            )
+          : [
+              ...nds,
+              {
+                id: mockId,
+                type: 'mockButton',
+                data: {
+                  inputs: mockInputs,
+                  isMainnet,
+                  rpcUrl,
+                  useData: () => ({ timeOfDay, swapVolumeData }),
+                },
+                position: mockPosition,
+              },
+            ];
+        return updatedNodes;
+      });
+
+      setEdges((eds) => {
+        const edgeId = `e${amountNode.id}-${mockId}`;
+        const existingEdge = eds.find((e) => e.id === edgeId);
+        if (!existingEdge) {
+          return [...eds.filter((e) => e.target !== mockId), { id: edgeId, source: amountNode.id, target: mockId, animated: true }];
+        }
+        return eds;
+      });
+    }
+  }, [mockInputs, amountNodeId, setNodes, setEdges, isMainnet, rpcUrl, timeOfDay, swapVolumeData, isWalletConnected]);
+
+  const addInitialOptionsNode = (x, y) => {
+    const newNode = {
       id: `${Date.now()}`,
       type: 'options',
       data: {
         options: ['Add TX', 'Mock TX'],
-        onSelect: (nodeId: string, selectedOption: string) => {
-          setNodes((nds: CustomNode[]) => {
+        onSelect: (nodeId, selectedOption) => {
+          setNodes((nds) => {
             const node = nds.find((n) => n.id === nodeId);
             if (!node) return nds;
             const newX = node.position.x;
@@ -461,15 +645,15 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
                 type: 'transaction',
                 data: {
                   label: selectedOption,
-                  onAddNode: (txNodeId: string) => {
-                    setNodes((nds: CustomNode[]) => {
+                  onAddNode: (txNodeId) => {
+                    setNodes((nds) => {
                       const txNode = nds.find((n) => n.id === txNodeId);
-                      if (!txNode || (txNode.data as TransactionNodeData).hasChild) return nds;
+                      if (!txNode || txNode.data.hasChild) return nds;
                       const { position } = txNode;
                       const newId = `${Date.now()}`;
                       const updatedTxNode = { ...txNode, data: { ...txNode.data, hasChild: true } };
                       let newNodes = nds.map((n) => (n.id === txNodeId ? updatedTxNode : n));
-                      let childNode: CustomNode;
+                      let childNode;
 
                       if (selectedOption === 'Add TX') {
                         childNode = {
@@ -477,8 +661,46 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
                           type: 'textInput',
                           data: {
                             label: 'Enter TX Hash',
-                            onSubmit: (hash: string) => {
+                            onSubmit: (hash) => {
                               setFetchingNodeId(newId);
+                              // Clear previous result nodes and edges
+                              setNodes((nds) => {
+                                const resultNodeTypes = [
+                                  'traceContainer',
+                                  'callNode',
+                                  'summaryNode',
+                                  'digDeeper',
+                                  'options', // If spawned by digDeeper
+                                  'inspect',
+                                  'table',
+                                  'textInput' // Nested textInput from Cross Examine
+                                ];
+                                const nodesToKeep = nds.filter((n) => 
+                                  !resultNodeTypes.includes(n.type) || n.id === newId // Keep the current input node
+                                );
+                                return nodesToKeep;
+                              });
+                              setEdges((eds) => {
+                                const resultNodeTypes = [
+                                  'traceContainer',
+                                  'callNode',
+                                  'summaryNode',
+                                  'digDeeper',
+                                  'options',
+                                  'inspect',
+                                  'table',
+                                  'textInput'
+                                ];
+                                return eds.filter((e) => {
+                                  const sourceNode = nodes.find((n) => n.id === e.source);
+                                  const targetNode = nodes.find((n) => n.id === e.target);
+                                  return (
+                                    (!sourceNode || !resultNodeTypes.includes(sourceNode.type) || e.source === txNodeId) &&
+                                    (!targetNode || !resultNodeTypes.includes(targetNode.type) || e.target === newId)
+                                  );
+                                });
+                              });
+                              resetTrace(); // Clear trace/receipt
                               fetchTrace(hash);
                             },
                           },
@@ -496,25 +718,33 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
                           data: {
                             options: ['Transfer', 'Swap'],
                             parentId: txNodeId,
-                            onSelect: (mockId: string, option: string) => {
-                              setNodes((nds: CustomNode[]) => {
+                            onSelect: (mockId, option) => {
+                              setNodes((nds) => {
                                 const mockNode = nds.find((n) => n.id === mockId);
                                 if (!mockNode || mockNode.type !== 'options') return nds;
-                                const parentId = (mockNode.data as OptionsNodeData).parentId;
+                                const parentId = mockNode.data.parentId;
                                 if (!parentId) return nds;
 
                                 const optionId = `${Date.now()}`;
-                                let newNodes: CustomNode[] = [];
-                                let newEdges: Edge[] = [];
+                                let newNodes = [];
+                                let newEdges = [];
 
                                 if (option in transactionInputs) {
                                   const inputs = transactionInputs[option];
-                                  const inputNodes = inputs.map((input) => ({
-                                    id: `${Date.now()}-${input.label.toLowerCase()}`,
-                                    type: 'input',
-                                    data: { label: input.label },
-                                    position: { x: mockNode.position.x + input.xOffset, y: mockNode.position.y + input.yOffset },
-                                  }));
+                                  const inputNodes = inputs.map((input) => {
+                                    const inputId = `${Date.now()}-${input.label.toLowerCase()}`;
+                                    return {
+                                      id: inputId,
+                                      type: 'input',
+                                      data: {
+                                        label: input.label,
+                                        onChange: (label, value, id) => handleInputChange(label, value, id),
+                                        onFocus: () => handleFocus(input.label, inputId),
+                                        isWalletConnected, // Pass wallet connection status
+                                      },
+                                      position: { x: mockNode.position.x + input.xOffset, y: mockNode.position.y + input.yOffset },
+                                    };
+                                  });
 
                                   newNodes = [
                                     ...nds.filter((n) => n.id !== mockId),
@@ -522,7 +752,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
                                       id: optionId,
                                       type: 'transaction',
                                       data: { label: option, onAddNode: () => {} },
-                                      position: { x: mockNode.position.x + 200, y: mockNode.position.y + -20 },
+                                      position: { x: mockNode.position.x + 200, y: mockNode.position.y - 20 },
                                     },
                                     ...inputNodes,
                                   ];
@@ -843,6 +1073,14 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
   const clearFlow = () => {
     setNodes([]);
     setEdges([]);
+    setMockInputs({}); // Clear mockInputs
+    setAmountNodeId(null); // Clear amountNodeId
+    setFetchingNodeId(null);
+    if (typeof resetTrace === 'function') {
+      resetTrace();
+    } else {
+      console.error('resetTrace is not a function:', resetTrace);
+    }
   };
 
   return (
@@ -874,6 +1112,18 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
         <button className={styles.restartButton} onClick={clearFlow}>
           <i className="fa-duotone fa-thin fa-rotate-left"></i>
         </button>
+        <ToastContainer
+        position="top-right" // Adjust position as needed
+        autoClose={5000} // Closes after 5 seconds
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        style={{ zIndex: 10000 }} // Inline z-index increase
+      />
         <LatestTxScroller />
       </ReactFlow>
     </>

@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   compiler: {
     styledComponents: false, // ✅ Enables SSR for styled-components
   },
+  
 };
 
 export default nextConfig;
