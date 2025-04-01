@@ -8,8 +8,11 @@ import LatestTxScroller from './latestTxScroller';
 import { useChainId, useAccount } from 'wagmi';
 import { useTransactionSimulation } from './useTransactionSimulation';
 import MiraAISuggestions from './miraAISuggestions';
+import { useSimulation } from '../../utils/SimulationContext';
+import SimulationResultBox from './SimulationResultBox';
 import { useData } from '../../utils/DataProvider';
 import { ToastContainer, toast } from 'react-toastify';
+import { SimulationProvider } from "../utils/SimulationContext";
 import 'react-toastify/dist/ReactToastify.css'; // Import default styles
 
 const gcpProjectId = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT_ID;
@@ -283,9 +286,9 @@ const transactionInputs = {
 
 // Parse trace data
 const parseTrace = (trace, parentId, position, contractNames = {}) => {
-  console.log('Parsing Trace:', trace);
+  // console.log('Parsing Trace:', trace);
   if (!trace || typeof trace !== 'object') {
-    console.error('Invalid trace data:', trace);
+    // console.error('Invalid trace data:', trace);
     return { nodes: [], edges: [], callCount: 0, errorCount: 0 };
   }
 
@@ -321,7 +324,7 @@ const parseTrace = (trace, parentId, position, contractNames = {}) => {
     });
   }
 
-  console.log('Generated Nodes:', nodes);
+  // console.log('Generated Nodes:', nodes);
   return { nodes, edges, callCount: nodes.length, errorCount: nodes.filter(n => n.type === 'errorNode').length };
 };
 
@@ -340,7 +343,7 @@ const InputNode = ({ data, id }) => {
     if (!data.isWalletConnected) {
       const now = Date.now();
       if (now - lastAlertTime > 1000) {
-        console.log("Toast triggered: Please connect your wallet first!");
+        // console.log("Toast triggered: Please connect your wallet first!");
         toast.error("Please connect your wallet first!", {
           position: "top-right",
           autoClose: 5000,
@@ -364,7 +367,7 @@ const InputNode = ({ data, id }) => {
     if (!data.isWalletConnected) {
       const now = Date.now();
       if (now - lastAlertTime > 1000) {
-        console.log("Toast triggered: Please connect your wallet first!");
+        // console.log("Toast triggered: Please connect your wallet first!");
         toast.error("Please connect your wallet first!", {
           position: "top-right",
           autoClose: 5000,
@@ -403,47 +406,27 @@ const InputNode = ({ data, id }) => {
 
 const MockButtonNode = ({ data, id }) => {
   const [loading, setLoading] = useState(false);
-  const [simulated, setSimulated] = useState(null);
   const { simulateTransfer } = useTransactionSimulation(data.rpcUrl);
-  const { timeOfDay, swapVolumeData } = data.useData();
+  const { setSimulationResult, clearSimulation } = useSimulation();
 
   const handleMock = async () => {
     setLoading(true);
+    clearSimulation();
     const { From, To, Amount } = data.inputs || {};
-    console.log('Inputs before simulation:', { From, To, Amount });
-    console.log(data)
     if (!From || !To || !Amount) {
-      setSimulated({ error: 'Missing required fields' });
+      setSimulationResult({ error: 'Missing required fields' });
       setLoading(false);
       return;
     }
     try {
-      const result = await simulateTransfer(From, To, String(Amount), data.isMainnet); // Ensure string
+      const result = await simulateTransfer(From, To, String(Amount), data.isMainnet);
       console.log('Simulation Result:', result);
-      setSimulated(result);
+      setSimulationResult(result); // Set to context, not local state
     } catch (error) {
-      console.error('Simulation Error:', error);
-      setSimulated({ error: error.message });
+      setSimulationResult({ error: error.message });
     } finally {
       setLoading(false);
     }
-  };
-
-  const getInsights = (gasEstimate) => {
-    const currentHour = new Date().getHours();
-    const currentHourData = timeOfDay.find(d => d.hour_of_day === currentHour);
-    const avgGasFeeEth = currentHourData?.avg_gas_fee_eth || 0;
-    const historicalAvg = timeOfDay.reduce((sum, d) => sum + d.avg_gas_fee_eth, 0) / timeOfDay.length;
-    const isGoodTime = avgGasFeeEth < historicalAvg * 0.9;
-    const nextBestHour = timeOfDay
-      .filter(d => d.hour_of_day > currentHour)
-      .sort((a, b) => a.avg_gas_fee_eth - b.avg_gas_fee_eth)[0]?.hour_of_day;
-
-    return {
-      gasEstimateEth: gasEstimate,
-      isGoodTime,
-      nextBestHour: nextBestHour ? `Wait until ${nextBestHour}:00` : 'No better time soon',
-    };
   };
 
   return (
@@ -453,25 +436,6 @@ const MockButtonNode = ({ data, id }) => {
         {loading ? <i className="fa-spin fa-spinner" /> : 'Simulate'}
       </button>
       <Handle type="source" position={Position.Bottom} style={{ background: '#00ffcc' }} />
-      {simulated && (
-        <div style={{ marginTop: '10px', textAlign: 'center' }}>
-          <p>Gas Estimate: {simulated.gasEstimate} wei</p>
-          {simulated.error ? (
-            <p>Error: {simulated.error}</p>
-          ) : (
-            <>
-              {(() => {
-                const insights = getInsights(simulated.gasEstimate);
-                return (
-                  <>
-                    <p>{insights.isGoodTime ? 'Good time to send!' : insights.nextBestHour}</p>
-                  </>
-                );
-              })()}
-            </>
-          )}
-        </div>
-      )}
     </div>
   );
 };
@@ -494,12 +458,13 @@ const nodeTypes = {
 
 const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, setEdges: any, nodes: CustomNode[], edges: Edge[] }) => {
   const { trace, receipt, loading, error, resetTrace, fetchTrace } = useTransactionTrace();
-  console.log('useTransactionTrace output:', { trace, receipt, loading, error, resetTrace, fetchTrace });
+  const { setSimulationResult, clearSimulation } = useSimulation();
+  // console.log('useTransactionTrace output:', { trace, receipt, loading, error, resetTrace, fetchTrace });
   const [fetchingNodeId, setFetchingNodeId] = useState(null);
   const { setCenter } = useReactFlow();
   const chainId = useChainId();
   const { address } = useAccount();
-  const { timeOfDay, swapVolumeData } = useData();
+  const { timeOfDay, gasFeeData, poolMetricsData } = useData();
   const [mockInputs, setMockInputs] = useState({});
   const [amountNodeId, setAmountNodeId] = useState(null); // Track Amount node ID
 
@@ -508,10 +473,10 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
   const rpcUrl = isMainnet ? MAINNET_RPC_URL : SEPOLIA_RPC_URL;
   const isWalletConnected = !!address; // True if address is defined, false if undefined
 
-  useEffect(() => {
-    console.log(`Wallet connected to ${isMainnet ? 'Mainnet' : isSepolia ? 'Sepolia' : 'Unknown'}, RPC: ${rpcUrl}`);
-    console.log("address", address)
-  }, [chainId]);
+  // useEffect(() => {
+  //   console.log(`Wallet connected to ${isMainnet ? 'Mainnet' : isSepolia ? 'Sepolia' : 'Unknown'}, RPC: ${rpcUrl}`);
+  //   console.log("address", address)
+  // }, [chainId]);
 
   // Validate Ethereum address
   const isValidEthAddress = (addr) => /^0x[a-fA-F0-9]{40}$/.test(addr);
@@ -525,7 +490,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
     }
     setMockInputs((prev) => {
       const newInputs = { ...prev, [label]: value };
-      console.log('mockInputs updated:', newInputs);
+      // console.log('mockInputs updated:', newInputs);
       if (label === 'Amount') {
         setAmountNodeId(nodeId);
       }
@@ -543,7 +508,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
       return;
     }
     if (label === 'From' && address) {
-      console.log("from entered with wallet address:", address);
+      // console.log("from entered with wallet address:", address);
       setMockInputs((prev) => ({ ...prev, From: address }));
       setNodes((nds) =>
         nds.map((node) =>
@@ -563,12 +528,12 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
       mockInputs.From !== mockInputs.To &&
       parseFloat(mockInputs.Amount) > 0;
 
-    console.log('useEffect - mockInputs:', mockInputs);
-    console.log('useEffect - hasAllFields:', hasAllFields);
-    console.log('useEffect - isValidInputs:', isValidInputs);
+    // console.log('useEffect - mockInputs:', mockInputs);
+    // console.log('useEffect - hasAllFields:', hasAllFields);
+    // console.log('useEffect - isValidInputs:', isValidInputs);
 
     if (!isWalletConnected) {
-      console.log('Wallet not connected, skipping MockButtonNode logic');
+      // console.log('Wallet not connected, skipping MockButtonNode logic');
       if (existingMockNode) {
         setNodes((nds) => nds.filter((n) => n.id !== existingMockNode.id));
         setEdges((eds) => eds.filter((e) => e.target !== existingMockNode.id));
@@ -577,7 +542,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
     }
 
     if (existingMockNode && !isValidInputs) {
-      console.log('Removing MockButtonNode due to invalid inputs');
+      // console.log('Removing MockButtonNode due to invalid inputs');
       setNodes((nds) => nds.filter((n) => n.id !== existingMockNode.id));
       setEdges((eds) => eds.filter((e) => e.target !== existingMockNode.id));
       return;
@@ -590,7 +555,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
         y: amountNode.position.y + MOCK_BUTTON_Y_OFFSET,
       };
 
-      console.log('Adding/updating MockButtonNode with inputs:', mockInputs);
+      // console.log('Adding/updating MockButtonNode with inputs:', mockInputs);
       setNodes((nds) => {
         const updatedNodes = existingMockNode
           ? nds.map((n) =>
@@ -624,7 +589,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
         return eds;
       });
     }
-  }, [mockInputs, amountNodeId, setNodes, setEdges, isMainnet, rpcUrl, timeOfDay, swapVolumeData, isWalletConnected]);
+  }, [mockInputs, amountNodeId, setNodes, setEdges, isMainnet, rpcUrl, timeOfDay, isWalletConnected]);
 
   const addInitialOptionsNode = (x, y) => {
     const newNode = {
@@ -828,10 +793,10 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
       alert('Only PYUSD transactions are supported.');
       return;
     }
-    console.log('Handle Data Fetched:', { trace, receipt });
+    // console.log('Handle Data Fetched:', { trace, receipt });
     const parentNode = nodes.find((n) => edges.some((e) => e.target === nodeId && e.source === n.id));
     if (!parentNode) {
-      console.error('Parent node not found for ID:', nodeId);
+      // console.error('Parent node not found for ID:', nodeId);
       return;
     }
   
@@ -1052,12 +1017,12 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
   
     setNodes((nds) => {
       const updatedNodes = [...nds, containerNode, ...traceNodes, summaryNode, digDeeperNode];
-      console.log('Updated Nodes:', updatedNodes);
+      // console.log('Updated Nodes:', updatedNodes);
       return updatedNodes;
     });
     setEdges((eds) => {
       const updatedEdges = [...eds, ...traceEdges];
-      console.log('Updated Edges:', updatedEdges);
+      // console.log('Updated Edges:', updatedEdges);
       return updatedEdges;
     });
   };
@@ -1076,8 +1041,9 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
     setMockInputs({}); // Clear mockInputs
     setAmountNodeId(null); // Clear amountNodeId
     setFetchingNodeId(null);
-    if (typeof resetTrace === 'function') {
+    if (typeof resetTrace === 'function' || typeof clearSimulation === 'function') {
       resetTrace();
+      clearSimulation();
     } else {
       console.error('resetTrace is not a function:', resetTrace);
     }
@@ -1126,6 +1092,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
       />
         <LatestTxScroller />
       </ReactFlow>
+      <SimulationResultBox timeOfDay={timeOfDay} gasFeeData={gasFeeData} poolMetricsData={poolMetricsData} />
     </>
   );
 };

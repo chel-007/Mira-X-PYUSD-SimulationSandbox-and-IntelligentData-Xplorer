@@ -1,0 +1,82 @@
+/* SimulationResultBox.module.css */
+.simulationBox {
+    position: fixed;
+    top: 120px;
+    right: 20px;
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    user-select: text;
+    cursor: text;
+    width: 320px;
+    min-height: 180px;
+    opacity: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .fadeIn {
+    animation: fadeIn 0.5s ease-in forwards;
+  }
+  
+  .processing {
+    /* No extra styling needed here, handled by wrappers */
+  }
+  
+  .contentWrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .processingWrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 140px; /* Matches result content height */
+  }
+  
+  .processingText {
+    color: #666;
+    font-style: italic;
+    animation: pulse 1.5s infinite;
+    text-align: center;
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .resultContent {
+    flex: 1;
+    color: black;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 140px; /* Consistent height */
+  }
+  
+  .suggestion {
+    font-weight: bold;
+    color: #2a9d8f;
+  }
+  
+  .detail {
+    color: #444;
+    font-size: 0.9em;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  @keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+  }

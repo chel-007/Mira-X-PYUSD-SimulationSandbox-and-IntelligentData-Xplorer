@@ -40,7 +40,7 @@ const Wallets = () => {
     tvl: number;
   }
 
-  const sections = ['Performance', 'Profitability', 'Alerts'];
+  const sections = ['Performance'];
 
   // Fetch Wallet Balance (PYUSD ERC-20)
   useEffect(() => {
@@ -562,7 +562,7 @@ const Wallets = () => {
               </div>
             </section>
 
-            <section className={styles.snapSection}>
+            {/* <section className={styles.snapSection}>
               <h2>Alerts</h2>
               <p>Set an alert for:</p>
               <ul>
@@ -571,7 +571,7 @@ const Wallets = () => {
                 <li>Arbitrage: Opportunity Detected</li>
               </ul>
               <button className={styles.actionButton}>Set Alert</button>
-            </section>
+            </section> */}
           </div>
 
           <div className={styles.navDots}>

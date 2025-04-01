@@ -186,59 +186,59 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // console.log("BigQuery Wallet Growth Data:", dailyWalletGrowth);
 
     // Process Gas Fees Chart data (historical)
-    // const gasComparisonData = bigQueryData.gasComparisonData.map((row: any) => {
-    //   const avgGasFeeEth = parseFloat(row.avg_gas_fee_eth);
-    //   return {
-    //     event_date: row.event_date,
-    //     event_type: row.event_type,
-    //     avg_gas_fee_eth: avgGasFeeEth,
-    //     avg_gas_fee_usd: ethPrice ? avgGasFeeEth * ethPrice : 0,
-    //     transaction_count: parseInt(row.transaction_count),
-    //   };
-    // });
+    const gasComparisonData = bigQueryData.gasComparisonData.map((row: any) => {
+      const avgGasFeeEth = parseFloat(row.avg_gas_fee_eth);
+      return {
+        event_date: row.event_date,
+        event_type: row.event_type,
+        avg_gas_fee_eth: avgGasFeeEth,
+        avg_gas_fee_usd: ethPrice ? avgGasFeeEth * ethPrice : 0,
+        transaction_count: parseInt(row.transaction_count),
+      };
+    });
 
     // Process Time of Day Chart data (historical)
-    // const timeOfDayData = bigQueryData.timeOfDayData.map((row: any) => {
-    //   const avgGasFeeEth = parseFloat(row.avg_gas_fee_eth);
-    //   return {
-    //     event_date: row.event_date,
-    //     hour_of_day: parseInt(row.hour_of_day),
-    //     avg_gas_fee_eth: avgGasFeeEth,
-    //     avg_gas_fee_usd: ethPrice ? avgGasFeeEth * ethPrice : 0,
-    //     transaction_count: parseInt(row.transaction_count),
-    //   };
-    // });
+    const timeOfDayData = bigQueryData.timeOfDayData.map((row: any) => {
+      const avgGasFeeEth = parseFloat(row.avg_gas_fee_eth);
+      return {
+        event_date: row.event_date,
+        hour_of_day: parseInt(row.hour_of_day),
+        avg_gas_fee_eth: avgGasFeeEth,
+        avg_gas_fee_usd: ethPrice ? avgGasFeeEth * ethPrice : 0,
+        transaction_count: parseInt(row.transaction_count),
+      };
+    });
 
-    // // Process Swap Volume Chart data (historical)
-    // const swapVolumeData = Array.isArray(bigQueryData.swapVolumeData)
-    //   ? bigQueryData.swapVolumeData.map((row: any) => ({
-    //       pool_address: row.pool_address.toLowerCase(),
-    //       date: row.date,
-    //       total_volume_usd: parseFloat(row.total_volume_usd),
-    //     }))
-    //   : [];
+    // Process Swap Volume Chart data (historical)
+    const swapVolumeData = Array.isArray(bigQueryData.swapVolumeData)
+      ? bigQueryData.swapVolumeData.map((row: any) => ({
+          pool_address: row.pool_address.toLowerCase(),
+          date: row.date,
+          total_volume_usd: parseFloat(row.total_volume_usd),
+        }))
+      : [];
 
     // Process Pool Metrics Chart data (historical)
-    // let poolData: PoolMetricsData[] = bigQueryData.poolMetricsData.map((row: any) => ({
-    //   pool_address: row.pool_address.toLowerCase(),
-    //   median_gas_fee_eth: parseFloat(row.median_gas_fee_eth),
-    //   swap_count: parseInt(row.swap_count),
-    //   total_volume_usd: parseFloat(row.total_volume_usd),
-    //   tvl_usd: 0, // Will be updated with Curve API data
-    //   apr: 0, // Will be updated with Curve API data
-    // }));
+    let poolData: PoolMetricsData[] = bigQueryData.poolMetricsData.map((row: any) => ({
+      pool_address: row.pool_address.toLowerCase(),
+      median_gas_fee_eth: parseFloat(row.median_gas_fee_eth),
+      swap_count: parseInt(row.swap_count),
+      total_volume_usd: parseFloat(row.total_volume_usd),
+      tvl_usd: 0, // Will be updated with Curve API data
+      apr: 0, // Will be updated with Curve API data
+    }));
 
     // Fetch Curve API data for TVL and APR
-    // const curvePoolsData = await fetchCurveData();
-    // poolData = poolData.map(pool => {
-    //   const poolAddress = pool.pool_address.toLowerCase();
-    //   const curveData = curvePoolsData[poolAddress] || { tvl: 0, baseApy: 0 };
-    //   return {
-    //     ...pool,
-    //     tvl_usd: curveData.tvl,
-    //     apr: curveData.baseApy,
-    //   };
-    // });
+    const curvePoolsData = await fetchCurveData();
+    poolData = poolData.map(pool => {
+      const poolAddress = pool.pool_address.toLowerCase();
+      const curveData = curvePoolsData[poolAddress] || { tvl: 0, baseApy: 0 };
+      return {
+        ...pool,
+        tvl_usd: curveData.tvl,
+        apr: curveData.baseApy,
+      };
+    });
 
     return {
       dailyData,
@@ -248,10 +248,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       totalWallets: bigQueryData.totalWallets,
     //   dormantWallets: bigQueryData.dormantWallets,
       hourlyVelocity,
-      // gasComparisonData,
-      // timeOfDayData,
-      // swapVolumeData,
-      // poolMetricsData: poolData,
+      gasComparisonData,
+      timeOfDayData,
+      swapVolumeData,
+      poolMetricsData: poolData,
     };
   };
 
@@ -268,10 +268,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setHistoricalWalletGrowthData(historicalData.dailyWalletGrowth);
     setHistoricalActiveWallets(historicalData.activeWallets);
     setHistoricalHourlyVelocity(historicalData.hourlyVelocity);
-    // setHistoricalGasFeeData(historicalData.gasComparisonData);
-    // setHistoricalTimeOfDay(historicalData.timeOfDayData);
-    // setHistoricalSwapVolumeData(historicalData.swapVolumeData);
-    // setHistoricalPoolMetricsData(historicalData.poolMetricsData);
+    setHistoricalGasFeeData(historicalData.gasComparisonData);
+    setHistoricalTimeOfDay(historicalData.timeOfDayData);
+    setHistoricalSwapVolumeData(historicalData.swapVolumeData);
+    setHistoricalPoolMetricsData(historicalData.poolMetricsData);
 
 const activeWalletSet = new Set(historicalData.activeWallets);
   setHistoricalActiveWalletSet(activeWalletSet);

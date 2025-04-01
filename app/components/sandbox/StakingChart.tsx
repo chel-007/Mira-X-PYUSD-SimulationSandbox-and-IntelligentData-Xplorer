@@ -175,7 +175,7 @@ activePools.forEach((d, i) => {
 
     // Legend
     const legend = svg.append('g')
-      .attr('transform', `translate(${centerX + 240}, 100)`);
+      .attr('transform', `translate(${centerX + 200}, 100)`);
 
     stakingData.forEach((d, i) => {
       const gradientId = d.pool.replace(/[^a-zA-Z0-9]/g, '-');
@@ -211,7 +211,7 @@ activePools.forEach((d, i) => {
 
     // APY and TVL explanation on the left side
     const infoGroup = svg.append('g')
-    .attr('transform', `translate(${centerX - 400}, 110)`);
+    .attr('transform', `translate(${centerX - 380}, 110)`);
 
     // Tooltip div (attached to chart container)
     const chartContainer = d3.select(chartRef.current);

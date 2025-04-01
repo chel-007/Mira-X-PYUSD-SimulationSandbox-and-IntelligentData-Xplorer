@@ -20,6 +20,8 @@ import { WagmiProvider } from 'wagmi';
 import { http, createConfig } from 'wagmi';
 import { mainnet, sepolia } from 'wagmi/chains';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { SimulationProvider } from "../utils/SimulationContext";
+import { walletModal } from '../lib/walletConfig'; // Import your config
 
 const gcpProjectId = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT_ID;
 const gcpApiKey = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_KEY;
@@ -62,7 +64,7 @@ const Sandbox = () => {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'transactions':
-        return <Transactions setNodes={setNodes} setEdges={setEdges} nodes={nodes} edges={edges} />;
+        return <SimulationProvider><Transactions setNodes={setNodes} setEdges={setEdges} nodes={nodes} edges={edges} />;</SimulationProvider>
       case 'wallets':
         return <Wallets />;
       case 'liquidityPools':
@@ -79,6 +81,7 @@ const Sandbox = () => {
   };
 
   return (
+    
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <div className={styles.container}>
@@ -120,7 +123,9 @@ const Sandbox = () => {
             </div>
             <div className={styles.canvas}>
               <ReactFlowProvider>
+                {/* <SimulationProvider> */}
                 {renderTabContent()}
+                {/* </SimulationProvider> */}
               </ReactFlowProvider>
             </div>
           </div>

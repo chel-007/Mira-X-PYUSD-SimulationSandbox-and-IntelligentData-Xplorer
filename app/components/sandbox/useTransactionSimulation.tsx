@@ -8,8 +8,23 @@ const PYUSD_SEPOLIA_ADDRESS = '0xcac524bca292aaade2df8a05cc58f0a65b1b3bb9'; // R
 const UNISWAP_ROUTER_ADDRESS = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'; // Mainnet; adjust for Sepolia
 
 const erc20Abi = [
-  'function transfer(address to, uint256 amount) public returns (bool)',
-  'function balanceOf(address account) public view returns (uint256)',
+  {
+    constant: false,
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    name: 'transfer',
+    outputs: [{ name: '', type: 'bool' }],
+    type: 'function',
+  },
+  {
+    constant: true,
+    inputs: [{ name: '_owner', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: '', type: 'uint256' }],
+    type: 'function',
+  },
 ];
 
 const uniswapRouterAbi = [
@@ -20,7 +35,27 @@ export const useTransactionSimulation = (rpcUrl:any) => {
   const provider = new JsonRpcProvider(rpcUrl);
   const { sendTransaction } = useSendTransaction();
 
+  console.log(rpcUrl)
+
   const simulateTransfer = async (from: string, to: string, amount: string, isMainnet: boolean) => {
+    const contractAddress = isMainnet ? PYUSD_MAINNET_ADDRESS : PYUSD_SEPOLIA_ADDRESS;
+
+  // Check balance
+  const balanceData = encodeFunctionData({
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: [from],
+  });
+  const balanceRaw = await provider.call({ to: contractAddress, data: balanceData });
+  const balance = BigInt(balanceRaw);
+  const amountWei = parseUnits(amount, 6);
+
+  console.log(`Balance: ${balance}, Amount: ${amountWei}`); // Debug
+  if (balance < amountWei) {
+    throw new Error(`Insufficient PYUSD balance: ${balance} < ${amountWei}`);
+  }
+    console.log("simulation was run")
+    console.log("details", simulateTransfer)
     const transferTx = {
       from,
       to: isMainnet ? PYUSD_MAINNET_ADDRESS : PYUSD_SEPOLIA_ADDRESS,
@@ -34,6 +69,8 @@ export const useTransactionSimulation = (rpcUrl:any) => {
 
     const gasEstimate = await provider.estimateGas(transferTx);
     const simulationResult = await provider.call(transferTx);
+    console.log(gasEstimate)
+    console.log(simulationResult)
     return {
         gasEstimate: gasEstimate.toString(),
         simulationResult,
