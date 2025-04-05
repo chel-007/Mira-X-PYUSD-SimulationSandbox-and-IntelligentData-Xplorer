@@ -2,7 +2,6 @@
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import { gsap } from "gsap";
-import styles from "../../styles/Explore.module.css";
 
 interface PoolMetricsData {
   pool_address: string;
@@ -22,7 +21,6 @@ const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ poolMetricsData }) 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const isFirstMount = useRef(true);
-  const isAnimating = useRef(false);
 
   useEffect(() => {
     const tooltip = document.createElement("div");
@@ -33,6 +31,9 @@ const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ poolMetricsData }) 
     tooltip.style.padding = "5px 10px";
     tooltip.style.borderRadius = "4px";
     tooltip.style.pointerEvents = "none";
+    tooltip.style.fontSize = "14px";
+    tooltip.style.fontFamily = "Josefin Sans, sans-serif";
+    tooltip.style.fontWeight = "200";
     tooltip.style.opacity = "0";
     tooltip.style.zIndex = "1000";
     document.body.appendChild(tooltip);
@@ -46,140 +47,165 @@ const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ poolMetricsData }) 
     };
   }, []);
 
-  const renderChart = (width: number, height: number) => {
-    if (isAnimating.current) {
-      console.log("Animation in progress, skipping render");
+  const formatToMillions = (value: number): string => {
+    const millions = value / 1000000;
+    return millions >= 1 ? `${millions.toFixed(1)}M` : value.toFixed(2);
+  };
+
+  const renderChart = (width: number, height: number, animate: boolean) => {
+    if (!svgRef.current || !containerRef.current || !poolMetricsData.length) {
+      // console.log("Chart not rendering:", { svg: !!svgRef.current, container: !!containerRef.current, dataLength: poolMetricsData.length });
       return;
     }
-    if (!svgRef.current || !containerRef.current || !poolMetricsData.length) {
-      console.log("Chart not rendering due to missing SVG, container, or data:", {
-        svg: !!svgRef.current,
-        container: !!containerRef.current,
-        dataLength: poolMetricsData.length,
-      });
+
+    // console.log("Input poolMetricsData:", poolMetricsData);
+
+    // Check if data is complete (2 pools, 4 metrics each)
+    const hasCompleteData = poolMetricsData.length === 2 &&
+      poolMetricsData.every(d =>
+        d.median_gas_fee_eth !== undefined &&
+        d.total_volume_usd !== undefined &&
+        d.tvl_usd !== undefined &&
+        d.apr !== undefined
+      );
+
+    if (!hasCompleteData) {
+      // console.log("Data incomplete, waiting for full update...");
       return;
     }
 
     const svg = d3.select(svgRef.current);
-    const margin = { top: 20, right: 30, bottom: 40, left: 50 };
+    const margin = { top: 20, right: 50, bottom: 40, left: 50 };
     const legendWidth = 150;
     const innerWidth = width - margin.left - margin.right - legendWidth;
     const innerHeight = height - margin.top - margin.bottom;
 
-    if (isFirstMount.current) {
-      svg.selectAll("*").remove();
-    }
+    if (isFirstMount.current) svg.selectAll("*").remove();
 
-    const metrics = ["median_gas_fee_eth", "total_volume_usd", "tvl_usd", "apr"];
+    const metrics = ["avg_gas", "volume", "tvl", "apr"];
+    const metricToKey = {
+      avg_gas: "median_gas_fee_eth",
+      volume: "total_volume_usd",
+      tvl: "tvl_usd",
+      apr: "apr",
+    };
     const color = d3.scaleOrdinal()
       .domain(metrics)
-      .range(["#FF9F1C", "#1E90FF", "#FED766", "#E71D36"]);
+      .range(["rgba(22, 172, 238, 0.8)", "rgba(135, 206, 235, 0.8)", "rgba(0, 102, 204, 0.8)", "rgba(0, 150, 136, 0.8)"]);
 
-    const normalizedData = poolMetricsData.map(d => {
-      const result: any = { ...d, original: {} };
-      metrics.forEach(metric => {
-        result.original[metric] = d[metric] || 0;
-      });
-      return result;
-    });
+    // Prepare data
+    const data = poolMetricsData.map(d => ({
+      pool_address: d.pool_address,
+      median_gas_fee_eth: d.median_gas_fee_eth || 0,
+      total_volume_usd: d.total_volume_usd || 0,
+      tvl_usd: d.tvl_usd || 0,
+      apr: d.apr || 0,
+      swap_count: d.swap_count || 0,
+    }));
+    // console.log("Prepared data:", data);
 
-    const scales: { [key: string]: d3.ScaleLogarithmic<number, number> } = {};
-    ["median_gas_fee_eth", "apr"].forEach(metric => {
-      const values = poolMetricsData.map(d => d[metric] || 0);
-      const minValue = Math.max(d3.min(values)!, 0.0001);
-      const maxValue = d3.max(values)! * 1.1;
-      scales[metric] = d3.scaleLog()
-        .domain([minValue, maxValue])
-        .range([0, 1])
-        .base(10)
-        .clamp(true);
-    });
+    // Scales
+    const maxTvl = d3.max(data, d => d.tvl_usd)! * 1.1;
+    const yTvl = d3.scaleSqrt()
+      .domain([0, maxTvl])
+      .range([innerHeight, 0]);
 
-    normalizedData.forEach(d => {
-      ["median_gas_fee_eth", "apr"].forEach(metric => {
-        const value = d[metric] || 0;
-        d[metric] = value > 0 ? scales[metric](value) : 0;
-      });
-    });
+    const maxVolume = d3.max(data, d => d.total_volume_usd)! * 1.1;
+    const yVolume = d3.scaleSqrt()
+      .domain([0, maxVolume * 1.5])
+      .range([innerHeight, 0]);
+
+    const maxGas = d3.max(data, d => d.median_gas_fee_eth)! * 1.1;
+    const gasMultiplier = 300000000;
+    const yGas = d3.scaleLinear()
+      .domain([0, maxGas * gasMultiplier * 5])
+      .range([innerHeight, 0]);
+
+    const maxApr = d3.max(data, d => d.apr)! * 1.1;
+    const yApr = d3.scaleLinear()
+      .domain([0, maxApr * 2])
+      .range([innerHeight, 0]);
 
     const x0 = d3.scaleBand()
-      .domain(poolMetricsData.map(d => d.pool_address))
+      .domain(data.map(d => d.pool_address))
       .range([0, innerWidth])
       .padding(0.2);
 
     const x1 = d3.scaleBand()
       .domain(metrics)
       .range([0, x0.bandwidth()])
-      .padding(0.1);
-
-    const maxValue = d3.max(poolMetricsData, d => Math.max(d.total_volume_usd, d.tvl_usd || 0))! * 1.1;
-    const minValue = d3.min(poolMetricsData, d => Math.min(d.total_volume_usd, d.tvl_usd || 0))! || 0.0001;
-    const yLog = d3.scaleLog()
-      .domain([minValue, maxValue])
-      .range([innerHeight, 0])
-      .base(10)
-      .clamp(true);
-
-    const yNormalized = d3.scaleLinear()
-      .domain([0, 5])
-      .range([innerHeight, 0]);
-
-    const yNormalizedAPY = d3.scaleLinear()
-      .domain([0, 2])
-      .range([innerHeight, 0]);
+      .padding(0.01);
 
     const g = svg.select("g.chart-group").empty()
       ? svg.append("g").attr("class", "chart-group").attr("transform", `translate(${margin.left},${margin.top})`)
       : svg.select("g.chart-group").attr("transform", `translate(${margin.left},${margin.top})`);
 
+    // Bind pool groups
     const poolGroups = g.selectAll(".pool")
-      .data(normalizedData, d => d.pool_address);
+      .data(data, d => d.pool_address);
+
+    poolGroups.exit().remove();
 
     const poolGroupsEnter = poolGroups.enter()
       .append("g")
       .attr("class", "pool")
       .attr("transform", d => `translate(${x0(d.pool_address)},0)`);
 
-    poolGroupsEnter.merge(poolGroups)
+    const poolGroupsUpdate = poolGroupsEnter.merge(poolGroups)
       .attr("transform", d => `translate(${x0(d.pool_address)},0)`);
 
-    poolGroups.exit().remove();
+    // console.log("Pool groups data:", poolGroupsUpdate.data());
 
-    const bars = poolGroupsEnter.merge(poolGroups)
-      .selectAll("rect")
-      .data(d => metrics.map(key => ({ key, value: d[key], original: d.original[key], swap_count: d.swap_count })), d => d.key);
+    // Clear rects
+    poolGroupsUpdate.selectAll("rect").remove();
 
-      const barsEnter = bars.enter()
+    // Bind bars
+    const bars = poolGroupsUpdate.selectAll("rect")
+      .data(
+        d => metrics.map(key => ({
+          key,
+          value: key === "avg_gas" ? d[metricToKey[key]] * gasMultiplier : d[metricToKey[key]],
+          rawValue: d[metricToKey[key]],
+          swap_count: d.swap_count,
+          pool_address: d.pool_address,
+        })),
+        d => `${d.pool_address}-${d.key}`
+      );
+
+    // console.log("Bars data after binding:", bars.data());
+
+    bars.exit().remove();
+
+    const barsEnter = bars.enter()
       .append("rect")
       .attr("x", d => x1(d.key)!)
       .attr("width", x1.bandwidth())
-      .attr("fill", d => color(d.key) as string)
-      .attr("y", innerHeight)
-      .attr("height", 0);
-  
+      .attr("fill", d => color(d.key) as string);
+
     const getY = (d: { key: string; value: number }) => {
-      if (d.key === "median_gas_fee_eth") {
-        return d.value > 0 ? yNormalized(d.value) : innerHeight;
-      } else if (d.key === "apr") {
-        return d.value > 0 ? yNormalizedAPY(d.value) : innerHeight;
-      } else {
-        return d.value > 0 ? yLog(d.value) : innerHeight;
-      }
+      if (d.key === "tvl") return d.value > 0 ? yTvl(d.value) : innerHeight;
+      if (d.key === "volume") return d.value > 0 ? yVolume(d.value) : innerHeight;
+      if (d.key === "avg_gas") return d.value > 0 ? yGas(d.value) : innerHeight;
+      if (d.key === "apr") return d.value > 0 ? yApr(d.value) : innerHeight;
+      return innerHeight;
     };
-  
+
     const getHeight = (d: { key: string; value: number }) => {
-      if (d.key === "median_gas_fee_eth") {
-        return d.value > 0 ? innerHeight - yNormalized(d.value) : 0;
-      } else if (d.key === "apr") {
-        return d.value > 0 ? innerHeight - yNormalizedAPY(d.value) : 0;
-      } else {
-        return d.value > 0 ? innerHeight - yLog(d.value) : 0;
-      }
+      if (d.key === "tvl") return d.value > 0 ? innerHeight - yTvl(d.value) : 0;
+      if (d.key === "volume") return d.value > 0 ? innerHeight - yVolume(d.value) : 0;
+      if (d.key === "avg_gas") return d.value > 0 ? innerHeight - yGas(d.value) : 0;
+      if (d.key === "apr") return d.value > 0 ? innerHeight - yApr(d.value) : 0;
+      return 0;
     };
-  
-    if (isFirstMount.current && !isAnimating.current) {
-      isAnimating.current = true;
-      const allBars = barsEnter.merge(bars);
+
+    const allBars = barsEnter.merge(bars);
+
+    if (animate) {
+      // Animate on first render
+      allBars
+        .attr("y", innerHeight)
+        .attr("height", 0);
+
       allBars.each(function (d, i, nodes) {
         const bar = nodes[i];
         gsap.killTweensOf(bar);
@@ -187,37 +213,41 @@ const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ poolMetricsData }) 
         const barIndex = i % metrics.length;
         gsap.fromTo(
           bar,
-          { attr: { y: innerHeight, height: 0 } },
+          {
+            attr: { y: innerHeight, height: 0 },
+            opacity: 0,
+            rotation: 0,
+          },
           {
             attr: { y: getY(d), height: getHeight(d) },
-            duration: 2.2,
+            opacity: 1,
+            rotation: 0,
+            duration: 1.4,
             ease: "elastic.out(0.4, 0.5)",
-            delay: poolIndex * 0.5 + barIndex * 0.2,
+            delay: poolIndex * 0.5 + barIndex * 0.15,
             onComplete: () => {
-              if (i === nodes.length - 1) {
-                isAnimating.current = false;
-                isFirstMount.current = false;
-              }
+              gsap.set(bar, { rotation: 0, opacity: 1 });
             },
           }
         );
       });
     } else {
-      barsEnter.merge(bars)
-        .attr("x", d => x1(d.key)!)
-        .attr("width", x1.bandwidth())
-        .attr("y", getY)
-        .attr("height", getHeight);
+      // No animation on resize or data updates
+      allBars
+        .attr("y", d => getY(d))
+        .attr("height", d => getHeight(d))
+        .attr("opacity", 1);
     }
 
-    bars.exit().remove();
-
-    barsEnter.merge(bars)
+    // Tooltip
+    allBars
       .on("mouseover", (event, d) => {
         if (tooltipRef.current) {
-          const tooltipText = d.key === "median_gas_fee_eth"
-            ? `${d.key}: ${d.original.toFixed(6)} ETH\nSwaps: ${d.swap_count}`
-            : `${d.key}: ${d.original.toFixed(2)}`;
+          const tooltipText = d.key === "avg_gas"
+            ? `${d.key}: ${d.rawValue.toFixed(6)} ETH\nSwaps: ${d.swap_count}`
+            : d.key === "tvl" || d.key === "volume"
+            ? `${d.key}: ${formatToMillions(d.rawValue)}`
+            : `${d.key}: ${d.rawValue.toFixed(2)}`;
           tooltipRef.current.style.opacity = "1";
           tooltipRef.current.innerHTML = tooltipText;
           tooltipRef.current.style.left = `${event.pageX + 10}px`;
@@ -231,23 +261,22 @@ const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ poolMetricsData }) 
         }
       })
       .on("mouseout", () => {
-        if (tooltipRef.current) {
-          tooltipRef.current.style.opacity = "0";
-        }
+        if (tooltipRef.current) tooltipRef.current.style.opacity = "0";
       });
 
+    // Axes
     if (isFirstMount.current) {
       g.append("g")
         .attr("class", "x-axis")
         .attr("transform", `translate(0,${innerHeight})`)
-        .call(d3.axisBottom(x0).tickFormat(d => d.slice(0, 10) + "..."))
+        .call(d3.axisBottom(x0).tickFormat(d => `${d.slice(0, 4)}...${d.slice(-4)}`))
         .selectAll("text")
         .attr("fill", "#fff")
         .style("text-anchor", "middle");
 
       g.append("g")
         .attr("class", "y-axis-left")
-        .call(d3.axisLeft(yLog).ticks(5, d3.format(".2s")))
+        .call(d3.axisLeft(yTvl).ticks(5, d3.format("~s")))
         .selectAll("text")
         .attr("fill", "#fff")
         .append("text")
@@ -256,12 +285,12 @@ const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ poolMetricsData }) 
         .attr("y", 6)
         .attr("dy", "-3em")
         .attr("text-anchor", "end")
-        .text("Volume/TVL (USD)");
+        .text("TVL / Volume / Gas");
 
       g.append("g")
         .attr("class", "y-axis-right")
         .attr("transform", `translate(${innerWidth}, 0)`)
-        .call(d3.axisRight(yNormalized).ticks(5, d3.format(".1f")))
+        .call(d3.axisRight(yApr).ticks(5, d3.format(".2f")))
         .selectAll("text")
         .attr("fill", "#fff")
         .append("text")
@@ -270,41 +299,40 @@ const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ poolMetricsData }) 
         .attr("y", -6)
         .attr("dy", "-3em")
         .attr("text-anchor", "end")
-        .text("Gas/APR (Normalized)");
+        .text("APR");
+
+      isFirstMount.current = false;
     } else {
       g.select(".x-axis")
         .attr("transform", `translate(0,${innerHeight})`)
-        .call(d3.axisBottom(x0).tickFormat(d => d.slice(0, 10) + "..."))
+        .call(d3.axisBottom(x0).tickFormat(d => `${d.slice(0, 4)}...${d.slice(-4)}`))
         .selectAll("text")
-        .attr("fill", "#fff")
-        .style("text-anchor", "middle");
+        .attr("fill", "#fff");
 
       g.select(".y-axis-left")
-        .call(d3.axisLeft(yLog).ticks(5, d3.format(".2s")))
+        .call(d3.axisLeft(yTvl).ticks(5, d3.format("~s")))
         .selectAll("text")
         .attr("fill", "#fff");
 
       g.select(".y-axis-right")
         .attr("transform", `translate(${innerWidth}, 0)`)
-        .call(d3.axisRight(yNormalized).ticks(5, d3.format(".1f")))
+        .call(d3.axisRight(yApr).ticks(5, d3.format(".2f")))
         .selectAll("text")
         .attr("fill", "#fff");
     }
 
+    // Legend
     const legendContainer = d3.select(containerRef.current)
       .select(".legend-container")
       .style("width", `${legendWidth}px`)
       .style("height", `${innerHeight / 2}px`)
       .style("background", "#000")
       .style("color", "#fff")
-      .style("padding", "10px")
-      .style("justify-self", "flex-end")
-      .style("box-sizing", "border-box");
+      .style("padding", "10px");
 
     legendContainer.selectAll("*").remove();
-
     legendContainer.append("div")
-      .style("font-size", "16px")
+      .style("font-size", "15px")
       .style("font-weight", "bold")
       .style("margin-bottom", "10px")
       .text("Metrics Points");
@@ -325,17 +353,24 @@ const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ poolMetricsData }) 
 
     legendItems.append("span")
       .style("font-size", "14px")
-      .text(d => d.replace("_usd", "").replace("_eth", ""));
+      .style("font-family", "Josefin Sans, sans-serif")
+      .style("font-weight", 200)
+      .text(d => d);
   };
 
   useEffect(() => {
     let resizeTimeout: NodeJS.Timeout | null = null;
+    let renderTimeout: NodeJS.Timeout | null = null;
 
     const updateChartSize = () => {
-      if (containerRef.current && svgRef.current) {
+      if (containerRef.current && svgRef.current && poolMetricsData.length) {
         const width = containerRef.current.clientWidth || 600;
         const height = containerRef.current.clientHeight || 400;
-        if (poolMetricsData.length) renderChart(width, height);
+        if (renderTimeout) clearTimeout(renderTimeout);
+        renderTimeout = setTimeout(() => {
+          renderChart(width, height, isFirstMount.current);
+          isFirstMount.current = false;
+        }, 500);
       }
     };
 
@@ -343,9 +378,7 @@ const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ poolMetricsData }) 
 
     const resizeObserver = new ResizeObserver(() => {
       if (resizeTimeout) clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(() => {
-        updateChartSize();
-      }, 200);
+      resizeTimeout = setTimeout(updateChartSize, 200);
     });
 
     if (containerRef.current) resizeObserver.observe(containerRef.current);
@@ -353,13 +386,13 @@ const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ poolMetricsData }) 
     return () => {
       if (containerRef.current) resizeObserver.unobserve(containerRef.current);
       if (resizeTimeout) clearTimeout(resizeTimeout);
+      if (renderTimeout) clearTimeout(renderTimeout);
     };
   }, [poolMetricsData]);
 
   useEffect(() => {
     return () => {
       isFirstMount.current = true;
-      isAnimating.current = false;
     };
   }, []);
 
@@ -372,6 +405,11 @@ const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ poolMetricsData }) 
 };
 
 export default PoolMetricsChart;
+
+
+
+
+
 
 
 // "use client";

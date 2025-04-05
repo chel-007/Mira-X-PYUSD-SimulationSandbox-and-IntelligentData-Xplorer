@@ -10,7 +10,7 @@ CREATE TEMP FUNCTION hexToDecimal(hex STRING) RETURNS STRING LANGUAGE js AS """
 """;
 
 -- Create the table
-CREATE TABLE `quick-wall-430008-u8.default.lp_activity_and_gas` AS
+CREATE TABLE `.default.lp_activity_and_gas` AS
 -- Part 1: PYUSD Transfers and Uniswap Swaps from decoded_events
 SELECT
   e.block_number,

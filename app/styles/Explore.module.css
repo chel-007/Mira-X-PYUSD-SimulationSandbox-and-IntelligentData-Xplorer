@@ -10,23 +10,6 @@
     font-family: "Josefin Sans", sans-serif;
     overflow: hidden;
   }
-
-/* .container * {
-    border: 1px solid red !important;
-} */
-
-
-  
-/* .pageAnimation {
-    width: 10px;
-    height: 10px;
-    background: #7BCFFF;
-    border-radius: 50%;
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-} */
   
   .topBar {
     width: 100%;
@@ -62,7 +45,7 @@
 }
 
 .homeButton:hover {
-    background: rgba(255, 255, 255, 0.185); /* Lighter hover effect */
+    background: rgba(255, 255, 255, 0.185);
 }
    
 .sandboxStatus {
@@ -88,7 +71,7 @@
     font-weight: bold;
     color: #7BCFFF;
     text-shadow: 0px 0px 10px #7BCFFF;
-    margin-bottom: 0; /* Remove margin-bottom since topBar handles spacing */
+    margin-bottom: 0;
 }
 
 .pulse {
@@ -136,7 +119,7 @@
 
 @keyframes pulse {
     0% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.5); opacity: 0.8; } /* Slightly larger pulse */
+    50% { transform: scale(1.5); opacity: 0.8; }
     100% { transform: scale(1); opacity: 1; }
 }
 
@@ -179,13 +162,6 @@
     border-radius: 0 0 60px 60px;
 }
 
-/* .transactionChart {
-    grid-area: transaction;
-    padding: 10px;
-    background-image: url('/grid-background-1.png');
-    width: 100%;
-    height: 100%;
-} */
 .tab {
     width: 250px;
     position: relative;
@@ -202,27 +178,17 @@
 
 .tab:hover {
     width: 250px;
-    /* height: 50px; */
     background: rgba(255, 255, 255, 0.114);
     border: rgba(255, 255, 255, 0.3) 0.2px solid;
 }
 
 .activeTab {
     width: 250px;
-    /* height: 50px; */
     background: black;
     border: rgba(129, 132, 153, 0.15) 0.2px solid;
     color: #7BCFFF;
 }
 
-/* .tooltip {
-    position: absolute;
-    background: #333;
-    color: #fff;
-    padding: 5px;
-    border-radius: 3px;
-    pointer-events: none;
-  } */
 
   .tooltip {
     font-size: 12px;
@@ -230,14 +196,14 @@
     background: rgba(0, 0, 0, 0.8);
     padding: 4px 8px;
     border-radius: 4px;
-    pointer-events: none; /* Prevents tooltips from interfering with mouse events */
-    opacity: 0; /* Hidden by default */
-    transition: opacity 0.2s ease; /* Fallback for non-GSAP animation */
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
   }
   
   .tooltipValue {
     font-size: 10px;
-    fill: #7BCFFF; /* Match your chart’s primary color */
+    fill: #7BCFFF;
     text-anchor: middle;
     pointer-events: none;
   }
@@ -266,12 +232,12 @@
   
   /* Left and Right Sides for "adoption" tab */
   .tabCharts > .chartWrapper:first-child {
-    flex: 1; /* TransactionChart takes half the width */
+    flex: 1;
     min-width: 300px;
   }
   
   .rightSide {
-    flex: 1; /* Right side takes the other half */
+    flex: 1;
     min-width: 300px;
     display: flex;
     flex-direction: column;
@@ -280,27 +246,27 @@
   
   /* WalletGrowthChart on top */
   .rightSide > .chartWrapper {
-    flex: 1; /* Takes half the height of rightSide */
+    flex: 1;
   }
 
   .bottomPair {
-    flex: 1; /* Takes the other half of the height */
+    flex: 1; 
     display: flex;
     gap: 10px;
   }
   
   .bottomPair > .chartWrapper {
-    flex: 1; /* Each chart takes half the width of bottomPair */
+    flex: 1;
     min-width: 200px;
   }
 
 .chartWrapper {
     flex: 1; /* Grows to fill available space */
-    min-width: 300px; /* Minimum width before wrapping */
+    min-width: 300px;
     display: flex;
     flex-direction: column;
     height: 100%;
-    background: rgba(255, 255, 255, 0.05); /* Optional: subtle background */
+    background: rgba(255, 255, 255, 0.05); 
     border-radius: 10px;
     overflow: hidden;
   }
@@ -319,7 +285,7 @@
   }
   
   .chartExtra {
-    justify-content: flex-start; /* Align content to the left */
+    justify-content: flex-start; 
   }
   
   .chartTitle {
@@ -330,18 +296,18 @@
     justify-content: center;
   }
   
-  /* When no controls are present, title takes full width */
+
   .chartHeader:not(.hasControls) .chartTitle {
     flex: 1;
   }
   
   .chartControls {
-    justify-content: flex-end; /* Align buttons to the right */
+    justify-content: flex-end; 
     gap: 5px;
   }
   
   .chartContent {
-    flex: 1; /* Takes remaining space */
+    flex: 1;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -352,8 +318,8 @@
     width: 100%;
     height: 100%;
     display: flex;
-  justify-content: center; /* Center horizontally */
-  align-items: center; /* Center vertically */
+  justify-content: center;
+  align-items: center;
     overflow: hidden;
   }
   
@@ -361,18 +327,18 @@
     font-size: 18px;
     color: #fff;
     position: absolute;
-    transition: opacity 0.3s ease; /* Fade effect */
+    transition: opacity 0.3s ease;
     opacity: 1;
   }
   
   .chartWrapper:not(.loading) .loading {
-    opacity: 0; /* Fade out when loading is false */
+    opacity: 0;
   }
 
   .toggleContainer {
     display: flex;
     align-items: center;
-    margin-left: 10px; /* Space from the title */
+    margin-left: 10px; 
   }
   
   .toggleLabel {
@@ -410,7 +376,7 @@
   }
   
   .toggleLabel input:checked + .toggleSlider {
-    background-color: #7BCFFF; /* Match your chart's primary color */
+    background-color: #7BCFFF;
   }
   
   .toggleLabel input:checked + .toggleSlider:before {

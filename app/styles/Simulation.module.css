@@ -1,80 +1,113 @@
-/* SimulationResultBox.module.css */
+/* Container for positioning */
+.simulationContainer {
+  position: fixed;
+  top: 140px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+}
+
+/* Arrow toggle button */
+.arrowToggle {
+  position: fixed;
+  top: calc(120px + 65px); /* Box top (120px) + half box height (180px / 2 = 90px) - half arrow height (50px / 2 = 25px) */
+  right: 340px; /* Outside box when visible */
+  width: 30px;
+  height: 50px;
+  background: rgba(129, 132, 153, 0.08);
+  color: #ffffffcb;
+  border: none;
+  border-radius: 8px 0 0 8px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: right 0.5s ease;
+  z-index: 1001;
+}
+
+/* Adjust arrow position when hidden */
+.hidden .arrowToggle {
+  right: 20px;
+}
+
+/* Simulation box */
 .simulationBox {
-    position: fixed;
-    top: 120px;
-    right: 20px;
-    background: #fff;
-    border: 1px solid #ccc;
-    color: black;
-    padding: 15px;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    z-index: 1000;
-    user-select: text;
-    cursor: text;
-    width: 320px;
-    min-height: 180px;
-    opacity: 0;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .fadeIn {
-    animation: fadeIn 0.5s ease-in forwards;
-  }
-  
-  
-  .contentWrapper {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .processingWrapper {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    min-height: 140px; /* Matches result content height */
-  }
-  
-  .processingText {
-    color: #666;
-    font-style: italic;
-    animation: pulse 1.5s infinite;
-    text-align: center;
-    flex-grow: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .resultContent {
-    flex: 1;
-    color: black;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    min-height: 140px; /* Consistent height */
-  }
-  
-  .suggestion {
-    font-weight: bold;
-    color: #2a9d8f;
-  }
-  
-  .detail {
-    color: #444;
-    font-size: 0.9em;
-  }
-  
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  
-  @keyframes pulse {
-    0% { opacity: 0.6; }
-    50% { opacity: 1; }
-    100% { opacity: 0.6; }
-  }
+  background: #ffffffe9;
+  border: 1px solid #ccc;
+  color: black;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.38);
+  user-select: text;
+  cursor: text;
+  width: 320px;
+  min-height: 180px;
+  transition: transform 0.5s ease;
+}
+
+/* Slide states */
+.boxVisible {
+  transform: translateX(0);
+}
+
+.boxHidden {
+  transform: translateX(360px); /* Off-screen */
+}
+
+.contentWrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.processingWrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 140px;
+}
+
+.processingText {
+  color: #666;
+  font-style: italic;
+  animation: pulse 1.5s infinite;
+  text-align: center;
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.resultContent {
+  flex: 1;
+  color: black;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 140px;
+}
+
+.suggestion {
+  font-weight: bold;
+  color: #2a9d8f;
+}
+
+.detail {
+  color: #444;
+  font-size: 0.9em;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}

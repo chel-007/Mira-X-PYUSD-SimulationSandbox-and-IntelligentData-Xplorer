@@ -2,7 +2,6 @@
 import React, { useLayoutEffect, useRef, useEffect } from "react";
 import * as d3 from "d3";
 import { gsap } from "gsap";
-import styles from "../../styles/Explore.module.css";
 
 interface ActiveWalletsChartProps {
   activeWallets: number;
@@ -50,10 +49,12 @@ const ActiveWalletsChart: React.FC<ActiveWalletsChartProps> = ({ activeWallets, 
       .innerRadius(radius * 0.5)
       .outerRadius(radius * 1);
 
+    const pieData = pie(data);
+
     if (isFirstMount.current) {
-      // Initial render with animation
+      // Initial render with GSAP fade-in
       const slices = g.selectAll(".arc")
-        .data(pie(data))
+        .data(pieData)
         .enter()
         .append("path")
         .attr("class", "arc")
@@ -62,7 +63,7 @@ const ActiveWalletsChart: React.FC<ActiveWalletsChartProps> = ({ activeWallets, 
         .attr("opacity", 0);
 
       const labels = g.selectAll(".label")
-        .data(pie(data))
+        .data(pieData)
         .enter()
         .append("text")
         .attr("class", "label")
@@ -72,8 +73,8 @@ const ActiveWalletsChart: React.FC<ActiveWalletsChartProps> = ({ activeWallets, 
         .attr("transform", d => {
           const centroid = arc.centroid(d);
           if (d.data.label === "Active") {
-            const offsetY = -baseFontSize * 0.5; // Shift up by half the font size
-            return `translate(${centroid[0]}, ${centroid[1]})`;
+            const offsetY = -baseFontSize * 0.5;
+            return `translate(${centroid[0]}, ${centroid[1] + offsetY})`;
           }
           return `translate(${centroid[0]}, ${centroid[1]})`;
         })
@@ -89,6 +90,7 @@ const ActiveWalletsChart: React.FC<ActiveWalletsChartProps> = ({ activeWallets, 
         .text(`Total: ${totalWallets}`)
         .attr("opacity", 0);
 
+      // GSAP fade-in animation
       gsap.to(slices.nodes(), {
         opacity: 1,
         duration: 2,
@@ -104,13 +106,14 @@ const ActiveWalletsChart: React.FC<ActiveWalletsChartProps> = ({ activeWallets, 
         opacity: 0.6,
         duration: 2,
         delay: 0.6,
+        onComplete: () => {
+          isFirstMount.current = false; // Mark first render complete
+        }
       });
-
-      isFirstMount.current = false;
     } else {
       // Updates with smooth transitions
-      const slices = g.selectAll(".arc").data(pie(data));
-    
+      const slices = g.selectAll(".arc").data(pieData);
+
       const enteringSlices = slices.enter()
         .append("path")
         .attr("class", "arc")
@@ -120,16 +123,16 @@ const ActiveWalletsChart: React.FC<ActiveWalletsChartProps> = ({ activeWallets, 
       if (enteringSlices.size()) {
         gsap.to(enteringSlices.nodes(), { opacity: 1, duration: 0.5 });
       }
-    
+
       slices.transition().duration(500).attr("d", arc);
-    
+
       const exitingSlices = slices.exit();
       if (exitingSlices.size()) {
         gsap.to(exitingSlices.nodes(), { opacity: 0, duration: 0.5, onComplete: () => exitingSlices.remove() });
       }
-    
-      const labels = g.selectAll(".label").data(pie(data));
-    
+
+      const labels = g.selectAll(".label").data(pieData);
+
       const enteringLabels = labels.enter()
         .append("text")
         .attr("class", "label")
@@ -139,7 +142,7 @@ const ActiveWalletsChart: React.FC<ActiveWalletsChartProps> = ({ activeWallets, 
         .attr("transform", d => {
           const centroid = arc.centroid(d);
           if (d.data.label === "Active") {
-            const offsetY = -baseFontSize * 0.5; // Consistent with initial render
+            const offsetY = -baseFontSize * 0.5;
             return `translate(${centroid[0]}, ${centroid[1] + offsetY})`;
           }
           return `translate(${centroid[0]}, ${centroid[1]})`;
@@ -149,25 +152,25 @@ const ActiveWalletsChart: React.FC<ActiveWalletsChartProps> = ({ activeWallets, 
       if (enteringLabels.size()) {
         gsap.to(enteringLabels.nodes(), { opacity: 1, duration: 0.5 });
       }
-    
+
       labels.transition()
         .duration(500)
         .attr("font-size", baseFontSize)
         .attr("transform", d => {
           const centroid = arc.centroid(d);
           if (d.data.label === "Active") {
-            const offsetY = -baseFontSize * 0.5; // Consistent with initial render
+            const offsetY = -baseFontSize * 0.5;
             return `translate(${centroid[0]}, ${centroid[1] + offsetY})`;
           }
           return `translate(${centroid[0]}, ${centroid[1]})`;
         })
         .text(d => totalWallets ? `${((d.data.value / totalWallets) * 100).toFixed(1)}%` : "0%");
-    
+
       const exitingLabels = labels.exit();
       if (exitingLabels.size()) {
         gsap.to(exitingLabels.nodes(), { opacity: 0, duration: 0.5, onComplete: () => exitingLabels.remove() });
       }
-    
+
       const totalText = g.select(".total-text");
       if (totalText.empty()) {
         const newTotalText = g.append("text")
@@ -199,7 +202,7 @@ const ActiveWalletsChart: React.FC<ActiveWalletsChartProps> = ({ activeWallets, 
       }, 100);
     };
 
-    console.log("ActiveWalletsChart rendering with:", { activeWallets, dormantWallets, loading });
+    // console.log("ActiveWalletsChart rendering with:", { activeWallets, dormantWallets, loading });
     renderChart();
 
     const resizeObserver = new ResizeObserver(() => handleResize());

@@ -5,6 +5,8 @@ import { collection, onSnapshot, QuerySnapshot } from "firebase/firestore";
 import { db } from "../lib/clientFirestore";
 import { useEthPrice } from "../utils/EthPriceProvider";
 import { timeStamp } from "console";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 interface GasFeeOverTimeData {
   event_date: string;
@@ -121,6 +123,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const bigQueryData = await response.json();
     if (bigQueryData.error) {
       console.error("Failed to fetch BigQuery data:", bigQueryData.error);
+      toast.error(`Internet not stable. Please refresh the app ${bigQueryData.error}`, {
+        position: 'top-right',
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
       return null;
     }
     return bigQueryData;
@@ -141,6 +151,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error("Error fetching Curve API (getPools):", error);
+      toast.error(`Unstable Internet. Please refresh the app ${error}`, {
+        position: 'top-right',
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
     }
 
     try {
@@ -156,6 +174,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error("Error fetching Curve volume API:", error);
+      toast.error(`Unstable Internet. Please refresh the app ${error}`, {
+        position: 'top-right',
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
     }
     return curvePoolsData;
   };
@@ -263,6 +289,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const bigQueryData = await fetchBigQueryData();
     if (!bigQueryData) return null;
     const historicalData = await processBigQueryData(bigQueryData);
+    setGasFeesData(historicalData.gasComparisonData);
+    setTimeOfDay(historicalData.timeOfDayData);
 
     historicalDataRef.current = historicalData;
 
@@ -470,6 +498,14 @@ setMaxTxPerHour(500); // Adjust as needed
       },
       (error) => {
         console.error("Firestore error (transfer_transactions):", error);
+        toast.error(`Unstable Internet. Please refresh the app ${error}`, {
+          position: 'top-right',
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
 
         setLoading(false);
       }
@@ -485,6 +521,14 @@ setMaxTxPerHour(500); // Adjust as needed
 
       } catch (error) {
         console.error("Error loading historical data:", error);
+        toast.error(`Please refresh the app! ${error}`, {
+          position: 'top-right',
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
         setLoading(false);
       }
     };
@@ -627,14 +671,21 @@ setMaxTxPerHour(500); // Adjust as needed
         // console.log("his", historicalGasses)
 
         // Filter and process real-time gas fees
+        // Assume today’s date for real-time scope (or adjust to a few hours)
+        const today = new Date().toISOString().split("T")[0]; // e.g., "2025-04-05"
+
+        // Step 1: Process real-time gas fees from Firestore (today only)
         const realTimeGasFees = normalizedEvents
-          .filter(e => e.block_timestamp >= thirtyDaysAgo)
+          .filter(e => {
+            const eventDate = new Date(e.block_timestamp).toISOString().split("T")[0];
+            return eventDate === today; // Only today’s transactions
+          })
           .filter(e => {
             const date = new Date(e.block_timestamp).toISOString().split("T")[0];
             const eventType = e.event_type;
             const historicalTxHashes = historicalGasses
               .find(h => h.event_date === date && h.event_type === eventType)?.tx_hash || [];
-            return !historicalTxHashes.includes(e.tx_hash);
+            return !historicalTxHashes.includes(e.tx_hash); // Exclude duplicates
           })
           .reduce((acc: Record<string, { [type: string]: { totalGasEth: number; count: number } }>, event: any) => {
             const date = new Date(event.block_timestamp).toISOString().split("T")[0];
@@ -642,21 +693,22 @@ setMaxTxPerHour(500); // Adjust as needed
             const gasPrice = Number(event.gas_price);
             const gasUsed = Number(event.gas_used);
             const gasFeeEth = (gasPrice * gasUsed) / 1e18;
-  
+        
             if (isNaN(gasPrice) || isNaN(gasUsed) || isNaN(gasFeeEth)) {
               console.warn(`Skipping invalid gas data for ${eventType} on ${date}`, { gasPrice, gasUsed });
               return acc;
             }
-  
+        
             if (!acc[date]) acc[date] = {};
             if (!acc[date][eventType]) acc[date][eventType] = { totalGasEth: 0, count: 0 };
             acc[date][eventType].totalGasEth += gasFeeEth;
             acc[date][eventType].count += 1;
             return acc;
           }, {});
-  
+        
+        // Convert real-time gas fees to final format
         const realTimeGasFeeData = Object.entries(realTimeGasFees).flatMap(([date, types]) =>
-          Object.entries(types).map(([eventType, { totalGasEth, count,  }]) => {
+          Object.entries(types).map(([eventType, { totalGasEth, count }]) => {
             const avgGasFeeEth = totalGasEth / count;
             return {
               event_date: date,
@@ -667,58 +719,146 @@ setMaxTxPerHour(500); // Adjust as needed
             };
           })
         );
-  
-        // console.log("realtimegas", realTimeGasFeeData)
+        
+        // Step 2: Combine historical and real-time data
+        const combinedGasFees = historicalGasses.reduce((acc: Record<string, { [type: string]: { totalGasEth: number; count: number } }>, historical: any) => {
+          const { event_date, event_type, avg_gas_fee_eth, transaction_count } = historical;
+          const totalGasEth = avg_gas_fee_eth * transaction_count; // Reconstruct total from average
+        
+          if (!acc[event_date]) acc[event_date] = {};
+          if (!acc[event_date][event_type]) acc[event_date][event_type] = { totalGasEth: 0, count: 0 };
+          acc[event_date][event_type].totalGasEth += totalGasEth;
+          acc[event_date][event_type].count += transaction_count;
+          return acc;
+        }, {});
+        
+        // Merge real-time data into combinedGasFees
+        Object.entries(realTimeGasFees).forEach(([date, types]) => {
+          if (!combinedGasFees[date]) combinedGasFees[date] = {};
+          Object.entries(types).forEach(([eventType, { totalGasEth, count }]) => {
+            if (!combinedGasFees[date][eventType]) combinedGasFees[date][eventType] = { totalGasEth: 0, count: 0 };
+            combinedGasFees[date][eventType].totalGasEth += totalGasEth;
+            combinedGasFees[date][eventType].count += count;
+          });
+        });
+        
+        // Convert combined gas fees to final format
+        const gasFeeData = Object.entries(combinedGasFees).flatMap(([date, types]) =>
+          Object.entries(types).map(([eventType, { totalGasEth, count }]) => {
+            const avgGasFeeEth = totalGasEth / count;
+            return {
+              event_date: date,
+              event_type: eventType,
+              avg_gas_fee_eth: avgGasFeeEth,
+              avg_gas_fee_usd: ethPrice ? avgGasFeeEth * ethPrice : 0,
+              transaction_count: count,
+            };
+          })
+        );
+        
+        // Step 3: Set both states
+        // console.log("realtimegas", realTimeGasFeeData);
+        // console.log("combinedgas", gasFeeData);
+        // console.log("bigquerygas", historicalGasses)
         setRealTimeGasFeeData(realTimeGasFeeData);
+        setGasFeesData(gasFeeData);
 
         // Update Time of Day Chart (real-time)
-        // Update Time of Day Chart (real-time)
+
+        // Step 1: Process real-time time-of-day from Firestore (today only)
         const realTimeTimeOfDay = normalizedEvents
-        .filter(e => e.block_timestamp >= thirtyDaysAgo)
-        .reduce((acc: Record<string, { totalGasEth: number; totalGasUsd: number; count: number }>, event) => {
-          // Ensure valid gas data
-          const gasPrice = Number(event.gas_price);
-          const gasUsed = Number(event.gas_used);
-          const gasFeeEth = (gasPrice * gasUsed) / 1e18;
-      
-          if (isNaN(gasPrice) || isNaN(gasUsed) || isNaN(gasFeeEth)) {
-            console.warn(`Skipping invalid gas data for event at ${event.block_timestamp}`, { gasPrice, gasUsed });
-            return acc; // Skip NaN entries
-          }
-      
-          const date = new Date(event.block_timestamp);
-          const eventDate = date.toISOString().split("T")[0]; // "2025-03-30"
-          // console.log("eventdate", eventDate);
-          const hourOfDay = date.getUTCHours();
-          const gasFeeUsd = ethPrice ? gasFeeEth * ethPrice : 0;
-      
-          const key = `${eventDate}-${hourOfDay}`; // e.g., "2025-03-30-14"
-          // console.log("key", key);
+          .filter(e => {
+            const eventDate = new Date(e.block_timestamp).toISOString().split("T")[0];
+            return eventDate === today; // Only today’s transactions
+          })
+          .reduce((acc: Record<string, { totalGasEth: number; totalGasUsd: number; count: number }>, event) => {
+            // Ensure valid gas data
+            const gasPrice = Number(event.gas_price);
+            const gasUsed = Number(event.gas_used);
+            const gasFeeEth = (gasPrice * gasUsed) / 1e18;
+        
+            if (isNaN(gasPrice) || isNaN(gasUsed) || isNaN(gasFeeEth)) {
+              console.warn(`Skipping invalid gas data for event at ${event.block_timestamp}`, { gasPrice, gasUsed });
+              return acc; // Skip NaN entries
+            }
+        
+            const date = new Date(event.block_timestamp);
+            const eventDate = date.toISOString().split("T")[0]; // "2025-04-05"
+            const hourOfDay = date.getUTCHours();
+            const gasFeeUsd = ethPrice ? gasFeeEth * ethPrice : 0;
+        
+            const key = `${eventDate}-${hourOfDay}`; // e.g., "2025-04-05-14"
+            if (!acc[key]) {
+              acc[key] = { totalGasEth: 0, totalGasUsd: 0, count: 0 };
+            }
+            acc[key].totalGasEth += gasFeeEth;
+            acc[key].totalGasUsd += gasFeeUsd;
+            acc[key].count += 1;
+        
+            return acc;
+          }, {});
+        
+        // Convert real-time time-of-day to final format
+        const realTimeTimeOfDayData = Object.entries(realTimeTimeOfDay).map(([key, { totalGasEth, totalGasUsd, count }]) => {
+          const parts = key.split("-"); // ["2025", "04", "05", "14"]
+          const event_date = `${parts[0]}-${parts[1]}-${parts[2]}`; // "2025-04-05"
+          const hour_of_day = parseInt(parts[3], 10); // 14
+          return {
+            event_date,
+            hour_of_day,
+            avg_gas_fee_eth: totalGasEth / count,
+            avg_gas_fee_usd: totalGasUsd / count,
+            transaction_count: count,
+          };
+        });
+        
+        // Step 2: Combine historical and real-time time-of-day data
+        const historicalTimeOfDay = historicalDataRef.current?.timeOfDayData || [];
+        const combinedTimeOfDay = historicalTimeOfDay.reduce((acc: Record<string, { totalGasEth: number; totalGasUsd: number; count: number }>, historical) => {
+          const { event_date, hour_of_day, avg_gas_fee_eth, avg_gas_fee_usd, transaction_count } = historical;
+          const key = `${event_date}-${hour_of_day}`;
+          const totalGasEth = avg_gas_fee_eth * transaction_count; // Reconstruct total from average
+          const totalGasUsd = avg_gas_fee_usd * transaction_count;
+        
           if (!acc[key]) {
             acc[key] = { totalGasEth: 0, totalGasUsd: 0, count: 0 };
           }
-          acc[key].totalGasEth += gasFeeEth;
-          acc[key].totalGasUsd += gasFeeUsd;
-          acc[key].count += 1;
-      
+          acc[key].totalGasEth += totalGasEth;
+          acc[key].totalGasUsd += totalGasUsd;
+          acc[key].count += transaction_count;
           return acc;
         }, {});
-      
-      const realTimeTimeOfDayData = Object.entries(realTimeTimeOfDay).map(([key, { totalGasEth, totalGasUsd, count }]) => {
-        const parts = key.split("-"); // ["2025", "03", "30-14"]
-        const event_date = `${parts[0]}-${parts[1]}-${parts[2]}`; // "2025-03-30"
-        const hour_of_day = parseInt(parts[3], 10); // 5
-        // console.log('key parts', parts);
-        return {
-          event_date, // Full date like "2025-03-30"
-          hour_of_day, // Correct hour like 14
-          avg_gas_fee_eth: totalGasEth / count,
-          avg_gas_fee_usd: totalGasUsd / count,
-          transaction_count: count,
-        };
-      });
-      // console.log("realtimeofday", realTimeTimeOfDayData);
-      setRealTimeTimeOfDay(realTimeTimeOfDayData);
+        
+        // Merge real-time data into combinedTimeOfDay
+        Object.entries(realTimeTimeOfDay).forEach(([key, { totalGasEth, totalGasUsd, count }]) => {
+          if (!combinedTimeOfDay[key]) {
+            combinedTimeOfDay[key] = { totalGasEth: 0, totalGasUsd: 0, count: 0 };
+          }
+          combinedTimeOfDay[key].totalGasEth += totalGasEth;
+          combinedTimeOfDay[key].totalGasUsd += totalGasUsd;
+          combinedTimeOfDay[key].count += count;
+        });
+        
+        // Convert combined time-of-day to final format
+        const timeOfDayData = Object.entries(combinedTimeOfDay).map(([key, { totalGasEth, totalGasUsd, count }]) => {
+          const parts = key.split("-"); // ["2025", "04", "05", "14"]
+          const event_date = `${parts[0]}-${parts[1]}-${parts[2]}`; // "2025-04-05"
+          const hour_of_day = parseInt(parts[3], 10); // 14
+          return {
+            event_date,
+            hour_of_day,
+            avg_gas_fee_eth: totalGasEth / count,
+            avg_gas_fee_usd: totalGasUsd / count,
+            transaction_count: count,
+          };
+        });
+        
+        // Step 3: Set both states
+        console.log("realtimeofday", realTimeTimeOfDayData);
+        console.log("combinedtimeofday", timeOfDayData);
+        setRealTimeTimeOfDay(realTimeTimeOfDayData);
+        setTimeOfDay(timeOfDayData);
+
 
         // Update Swap Volume Chart (real-time)
         const realTimeSwapVolume = normalizedEvents
@@ -764,64 +904,178 @@ setMaxTxPerHour(500); // Adjust as needed
           acc[date][poolAddress] = (acc[date][poolAddress] || 0) + volumeUsd;
           return acc;
         }, {});
+
+        // console.log("historicalswapvolume", historicalData.current?.swapVolumeData)
       
       // console.log("realtimeswapvolume", realTimeSwapVolume);
         setRealTimeSwapVolumeData(realTimeSwapVolumeData);
 
         // Update Pool Metrics Chart (real-time)
         const realTimePoolMetrics = normalizedEvents
-          .filter(e => e.event_type === "Swap" && e.block_timestamp >= thirtyDaysAgo)
-          .reduce((acc: Record<string, { medianGasFees: number[]; swap_count: number; total_volume_usd: number }>, event: any) => {
-            const poolAddress = event.address.toLowerCase();
-            const gasFeeEth = (event.gas_price * event.gas_used) / 1e18;
-            let volumeUsd = 0;
-            if (event.event_type === "Swap") {
-              if (poolAddress === UNISWAP_POOL) {
-                const amount0 = parseFloat(event.args[2]) / 1_000_000;
-                const amount1 = parseFloat(event.args[3]) / 1_000_000;
-                volumeUsd = Math.abs(amount0) + Math.abs(amount1);
-              } else if (poolAddress === CURVE_POOL_PYUSD_CRVUSD) {
-                const soldId = parseInt(event.args.sold_id);
-                const boughtId = parseInt(event.args.bought_id);
-                const tokensSoldDecimals = soldId === 0 ? 1_000_000 : 1_000_000_000_000_000_000;
-                const tokensBoughtDecimals = boughtId === 0 ? 1_000_000 : 1_000_000_000_000_000_000;
-                const tokensSold = parseFloat(event.args.tokens_sold) / tokensSoldDecimals;
-                const tokensBought = parseFloat(event.args.tokens_bought) / tokensBoughtDecimals;
-                volumeUsd = tokensSold + tokensBought;
-              } else if (poolAddress === CURVE_POOL_PYUSD_USDC) {
-                const tokensSold = parseFloat(event.args.tokens_sold) / 1_000_000;
-                const tokensBought = parseFloat(event.args.tokens_bought) / 1_000_000;
-                volumeUsd = tokensSold + tokensBought;
-              }
-            }
-            // console.log("realtimepoolmetrics =events", realTimePoolMetrics)
-            if (!acc[poolAddress]) {
-              acc[poolAddress] = { medianGasFees: [], swap_count: 0, total_volume_usd: 0 };
-            }
-            acc[poolAddress].medianGasFees.push(gasFeeEth);
-            acc[poolAddress].swap_count += 1;
-            acc[poolAddress].total_volume_usd += volumeUsd;
-            return acc;
-          }, {});
+        .filter(e => e.event_type === "Swap" && e.block_timestamp >= thirtyDaysAgo)
+        .reduce((acc: Record<string, { medianGasFees: number[]; swap_count: number; total_volume_usd: number }>, event: any) => {
+          const poolAddress = event.address.toLowerCase();
+          const gasFeeEth = (event.gas_price * event.gas_used) / 1e18;
+          let volumeUsd = 0;
 
-        const realTimePoolMetricsData = Object.entries(realTimePoolMetrics).map(([pool_address, data]) => {
-          const sortedGasFees = data.medianGasFees.sort((a, b) => a - b);
-          const medianGasFeeEth = sortedGasFees[Math.floor(sortedGasFees.length / 2)];
-          return {
-            pool_address,
-            median_gas_fee_eth: medianGasFeeEth,
-            swap_count: data.swap_count,
-            total_volume_usd: data.total_volume_usd,
-            tvl_usd: 0, // Will be updated with Curve API data
-            apr: 0, // Will be updated with Curve API data
-          };
-        });
-        // console.log("realtimepoolmetrics", realTimePoolMetrics);
-        setRealTimePoolMetricsData(realTimePoolMetricsData);
-        setRealTimeLoading(false);
+          if (event.event_type === "Swap") {
+            if (poolAddress === CURVE_POOL_PYUSD_CRVUSD) {
+              const soldId = parseInt(event.args.sold_id);
+              const boughtId = parseInt(event.args.bought_id);
+              const tokensSoldDecimals = soldId === 0 ? 1_000_000 : 1_000_000_000_000_000_000; // PYUSD: 6, crvUSD: 18
+              const tokensBoughtDecimals = boughtId === 0 ? 1_000_000 : 1_000_000_000_000_000_000;
+              const tokensSold = parseFloat(event.args.tokens_sold) / tokensSoldDecimals;
+              const tokensBought = parseFloat(event.args.tokens_bought) / tokensBoughtDecimals;
+              volumeUsd = (tokensSold + tokensBought) / 2; // Average volume
+            } else if (poolAddress === CURVE_POOL_PYUSD_USDC) {
+              const tokensSold = parseFloat(event.args.tokens_sold) / 1_000_000; // PYUSD: 6
+              const tokensBought = parseFloat(event.args.tokens_bought) / 1_000_000; // USDC: 6
+              volumeUsd = (tokensSold + tokensBought) / 2; // Average volume
+            }
+          }
+
+          if (!acc[poolAddress]) {
+            acc[poolAddress] = { medianGasFees: [], swap_count: 0, total_volume_usd: 0 };
+          }
+          acc[poolAddress].medianGasFees.push(gasFeeEth);
+          acc[poolAddress].swap_count += 1;
+          acc[poolAddress].total_volume_usd += volumeUsd;
+          return acc;
+        }, {});
+
+        // console.log("realtimepoolmetrics", realTimePoolMetrics)
+
+      // Historical (all data from Firestore + BigQuery)
+      const historicalPoolMetrics = normalizedEvents
+        .filter(e => e.event_type === "Swap") // No time filter for historical
+        .reduce((acc: Record<string, { medianGasFees: number[]; swap_count: number; total_volume_usd: number }>, event: any) => {
+          const poolAddress = event.address.toLowerCase();
+          const gasFeeEth = (event.gas_price * event.gas_used) / 1e18;
+          let volumeUsd = 0;
+
+          if (event.event_type === "Swap") {
+            if (poolAddress === CURVE_POOL_PYUSD_CRVUSD) {
+              const soldId = parseInt(event.args.sold_id);
+              const boughtId = parseInt(event.args.bought_id);
+              const tokensSoldDecimals = soldId === 0 ? 1_000_000 : 1_000_000_000_000_000_000;
+              const tokensBoughtDecimals = boughtId === 0 ? 1_000_000 : 1_000_000_000_000_000_000;
+              const tokensSold = parseFloat(event.args.tokens_sold) / tokensSoldDecimals;
+              const tokensBought = parseFloat(event.args.tokens_bought) / tokensBoughtDecimals;
+              volumeUsd = (tokensSold + tokensBought) / 2; // Average volume
+            } else if (poolAddress === CURVE_POOL_PYUSD_USDC) {
+              const tokensSold = parseFloat(event.args.tokens_sold) / 1_000_000;
+              const tokensBought = parseFloat(event.args.tokens_bought) / 1_000_000;
+              volumeUsd = (tokensSold + tokensBought) / 2; // Average volume
+            }
+          }
+
+          if (!acc[poolAddress]) {
+            acc[poolAddress] = { medianGasFees: [], swap_count: 0, total_volume_usd: 0 };
+          }
+          acc[poolAddress].medianGasFees.push(gasFeeEth);
+          acc[poolAddress].swap_count += 1;
+          acc[poolAddress].total_volume_usd += volumeUsd;
+          return acc;
+        }, {});
+
+      // Merge with BigQuery historical data
+      const bigQueryPoolMetrics = historicalDataRef.current?.poolMetricsData || [];
+      bigQueryPoolMetrics.forEach((historical: any) => {
+        const poolAddress = historical.pool_address.toLowerCase();
+        if (!historicalPoolMetrics[poolAddress]) {
+          historicalPoolMetrics[poolAddress] = { medianGasFees: [], swap_count: 0, total_volume_usd: 0 };
+        }
+        historicalPoolMetrics[poolAddress].medianGasFees.push(historical.median_gas_fee_eth);
+        historicalPoolMetrics[poolAddress].swap_count += historical.swap_count;
+        historicalPoolMetrics[poolAddress].total_volume_usd += historical.total_volume_usd;
+      });
+
+      // Fetch APR and TVL for Curve pools
+      const curvePoolsData = await fetchCurveData();
+
+      // Process real-time metrics
+      const realTimePoolMetricsWithAprTvl = Object.entries(realTimePoolMetrics).map(([pool_address, data]) => {
+        const sortedGasFees = data.medianGasFees.sort((a, b) => a - b);
+        const medianGasFeeEth = sortedGasFees[Math.floor(sortedGasFees.length / 2)];
+        const curveData = curvePoolsData[pool_address] || { tvl: 0, baseApy: 0 };
+
+        return {
+          pool_address,
+          median_gas_fee_eth: medianGasFeeEth,
+          swap_count: data.swap_count,
+          total_volume_usd: data.total_volume_usd,
+          tvl_usd: curveData.tvl,
+          apr: curveData.baseApy
+        };
+      });
+
+      // Process historical metrics
+      const historicalPoolMetricsWithAprTvl = Object.entries(historicalPoolMetrics).map(([pool_address, data]) => {
+        const sortedGasFees = data.medianGasFees.sort((a, b) => a - b);
+        const medianGasFeeEth = sortedGasFees[Math.floor(sortedGasFees.length / 2)];
+        const curveData = curvePoolsData[pool_address] || { tvl: 0, baseApy: 0 };
+
+        return {
+          pool_address,
+          median_gas_fee_eth: medianGasFeeEth,
+          swap_count: data.swap_count,
+          total_volume_usd: data.total_volume_usd,
+          tvl_usd: curveData.tvl,
+          apr: curveData.baseApy
+        };
+      });
+
+      // Ensure both Curve pools are included for both real-time and historical
+      const allPools = [CURVE_POOL_PYUSD_CRVUSD, CURVE_POOL_PYUSD_USDC];
+
+      const finalRealTimePoolMetricsData = allPools.map(pool_address => {
+        const existingData = realTimePoolMetricsWithAprTvl.find(p => p.pool_address === pool_address);
+        if (existingData) return existingData;
+
+        const curveData = curvePoolsData[pool_address] || { tvl: 0, baseApy: 0 };
+        return {
+          pool_address,
+          median_gas_fee_eth: 0,
+          swap_count: 0,
+          total_volume_usd: 0,
+          tvl_usd: curveData.tvl,
+          apr: curveData.baseApy
+        };
+      });
+
+      const finalHistoricalPoolMetricsData = allPools.map(pool_address => {
+        const existingData = historicalPoolMetricsWithAprTvl.find(p => p.pool_address === pool_address);
+        if (existingData) return existingData;
+
+        const curveData = curvePoolsData[pool_address] || { tvl: 0, baseApy: 0 };
+        return {
+          pool_address,
+          median_gas_fee_eth: 0,
+          swap_count: 0,
+          total_volume_usd: 0,
+          tvl_usd: curveData.tvl,
+          apr: curveData.baseApy
+        };
+      });
+
+      // console.log("historicalpoolmetrics", historicalPoolMetrics)
+      // console.log("bigquerypoolmetrics", historicalDataRef.current?.poolMetricsData)
+
+      // console.log("finalRealTimePoolMetricsData:", finalRealTimePoolMetricsData);
+      // console.log("finalHistoricalPoolMetricsData:", finalHistoricalPoolMetricsData);
+      setRealTimePoolMetricsData(finalRealTimePoolMetricsData);
+      setPoolMetricsData(finalHistoricalPoolMetricsData); // Set historical data here
+      setRealTimeLoading(false);
       },
       (error) => {
-        console.error("Firestore error (lp_and_transfers):", error);
+        toast.error(`Unstable Internet. Please refresh the app ${error}`, {
+          position: 'top-right',
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
         setRealTimeLoading(false);
       }
     );
@@ -866,8 +1120,6 @@ setMaxTxPerHour(500); // Adjust as needed
   }, [historicalMonthlyVolume, realTimeMonthlyVolume]);
 
   useEffect(() => {
-    // console.log("Combining Wallet Growth - Historical:", historicalWalletGrowthData);
-    // console.log("Combining Wallet Growth - Real-Time:", realTimeWalletGrowthData);
     const combinedWalletGrowth = [...historicalWalletGrowthData];
     realTimeWalletGrowthData.forEach(rt => {
       const existing = combinedWalletGrowth.find(d => d.date === rt.date);
@@ -912,54 +1164,54 @@ setMaxTxPerHour(500); // Adjust as needed
 //   }, [historicalActiveWallets, historicalDormantWallets, realTimeActiveWallets, realTimeDormantWallets]);
 
   // Combine historical and real-time data for Gas Fees
-  useEffect(() => {
-    const combinedGasFeeData = [...historicalDataRef.current?.gasComparisonData || []];
-    realTimeGasFeeData.forEach(rt => {
-      const existing = combinedGasFeeData.find(
-        d => d.event_date === rt.event_date && d.event_type === rt.event_type
-      );
-      if (existing) {
-        const totalGasEth =
-          (existing.avg_gas_fee_eth * existing.transaction_count) +
-          (rt.avg_gas_fee_eth * rt.transaction_count);
-        const totalCount = existing.transaction_count + rt.transaction_count;
-        existing.avg_gas_fee_eth = totalGasEth / totalCount;
-        existing.avg_gas_fee_usd = ethPrice ? existing.avg_gas_fee_eth * ethPrice : 0;
-        existing.transaction_count = totalCount;
-      } else {
-        combinedGasFeeData.push(rt);
-      }
-    });
-    setGasFeesData(combinedGasFeeData.sort((a, b) => a.event_date.localeCompare(b.event_date)));
-  }, [historicalDataRef.current?.gasComparisonData, realTimeGasFeeData, ethPrice]);
+  // useEffect(() => {
+  //   const combinedGasFeeData = [...historicalDataRef.current?.gasComparisonData || []];
+  //   realTimeGasFeeData.forEach(rt => {
+  //     const existing = combinedGasFeeData.find(
+  //       d => d.event_date === rt.event_date && d.event_type === rt.event_type
+  //     );
+  //     if (existing) {
+  //       const totalGasEth =
+  //         (existing.avg_gas_fee_eth * existing.transaction_count) +
+  //         (rt.avg_gas_fee_eth * rt.transaction_count);
+  //       const totalCount = existing.transaction_count + rt.transaction_count;
+  //       existing.avg_gas_fee_eth = totalGasEth / totalCount;
+  //       existing.avg_gas_fee_usd = ethPrice ? existing.avg_gas_fee_eth * ethPrice : 0;
+  //       existing.transaction_count = totalCount;
+  //     } else {
+  //       combinedGasFeeData.push(rt);
+  //     }
+  //   });
+  //   setGasFeesData(combinedGasFeeData.sort((a, b) => a.event_date.localeCompare(b.event_date)));
+  // }, [historicalDataRef.current?.gasComparisonData, realTimeGasFeeData, ethPrice]);
 
   // Combine historical and real-time data for Time of Day
-  useEffect(() => {
-    const combinedTimeOfDay = [...historicalTimeOfDay];
-    realTimeTimeOfDay.forEach(rt => {
-      const existing = combinedTimeOfDay.find(
-        d => d.event_date === rt.event_date && d.hour_of_day === rt.hour_of_day
-      );
-      if (existing) {
-        existing.avg_gas_fee_eth =
-          (existing.avg_gas_fee_eth * existing.transaction_count +
-            rt.avg_gas_fee_eth * rt.transaction_count) /
-          (existing.transaction_count + rt.transaction_count);
-        existing.avg_gas_fee_usd =
-          (existing.avg_gas_fee_usd * existing.transaction_count +
-            rt.avg_gas_fee_usd * rt.transaction_count) /
-          (existing.transaction_count + rt.transaction_count);
-        existing.transaction_count += rt.transaction_count;
-      } else {
-        combinedTimeOfDay.push(rt);
-      }
-    });
-    setTimeOfDay(
-      combinedTimeOfDay.sort(
-        (a, b) => a.event_date.localeCompare(b.event_date) || a.hour_of_day - b.hour_of_day
-      )
-    );
-  }, [historicalTimeOfDay, realTimeTimeOfDay]);
+  // useEffect(() => {
+  //   const combinedTimeOfDay = [...historicalTimeOfDay];
+  //   realTimeTimeOfDay.forEach(rt => {
+  //     const existing = combinedTimeOfDay.find(
+  //       d => d.event_date === rt.event_date && d.hour_of_day === rt.hour_of_day
+  //     );
+  //     if (existing) {
+  //       existing.avg_gas_fee_eth =
+  //         (existing.avg_gas_fee_eth * existing.transaction_count +
+  //           rt.avg_gas_fee_eth * rt.transaction_count) /
+  //         (existing.transaction_count + rt.transaction_count);
+  //       existing.avg_gas_fee_usd =
+  //         (existing.avg_gas_fee_usd * existing.transaction_count +
+  //           rt.avg_gas_fee_usd * rt.transaction_count) /
+  //         (existing.transaction_count + rt.transaction_count);
+  //       existing.transaction_count += rt.transaction_count;
+  //     } else {
+  //       combinedTimeOfDay.push(rt);
+  //     }
+  //   });
+  //   setTimeOfDay(
+  //     combinedTimeOfDay.sort(
+  //       (a, b) => a.event_date.localeCompare(b.event_date) || a.hour_of_day - b.hour_of_day
+  //     )
+  //   );
+  // }, [historicalTimeOfDay, realTimeTimeOfDay]);
 
   // Combine historical and real-time data for Swap Volume
   useEffect(() => {
@@ -978,27 +1230,27 @@ setMaxTxPerHour(500); // Adjust as needed
   }, [historicalSwapVolumeData, realTimeSwapVolumeData]);
 
   // Combine historical and real-time data for Pool Metrics
-  useEffect(() => {
-    const combinedPoolMetrics = [...historicalPoolMetricsData];
-    realTimePoolMetricsData.forEach(rt => {
-      const existing = combinedPoolMetrics.find(d => d.pool_address === rt.pool_address);
-      if (existing) {
-        const allGasFees = [
-          ...Array(existing.swap_count).fill(existing.median_gas_fee_eth),
-          ...Array(rt.swap_count).fill(rt.median_gas_fee_eth),
-        ];
-        const sortedGasFees = allGasFees.sort((a, b) => a - b);
-        existing.median_gas_fee_eth = sortedGasFees[Math.floor(sortedGasFees.length / 2)];
-        existing.swap_count += rt.swap_count;
-        existing.total_volume_usd += rt.total_volume_usd;
-        // Preserve existing tvl_usd and apr, which are updated in the lp_and_transfers subscription
-      } else {
-        combinedPoolMetrics.push({ ...rt });
-      }
-    });
+  // useEffect(() => {
+  //   const combinedPoolMetrics = [...historicalPoolMetricsData];
+  //   realTimePoolMetricsData.forEach(rt => {
+  //     const existing = combinedPoolMetrics.find(d => d.pool_address === rt.pool_address);
+  //     if (existing) {
+  //       const allGasFees = [
+  //         ...Array(existing.swap_count).fill(existing.median_gas_fee_eth),
+  //         ...Array(rt.swap_count).fill(rt.median_gas_fee_eth),
+  //       ];
+  //       const sortedGasFees = allGasFees.sort((a, b) => a - b);
+  //       existing.median_gas_fee_eth = sortedGasFees[Math.floor(sortedGasFees.length / 2)];
+  //       existing.swap_count += rt.swap_count;
+  //       existing.total_volume_usd += rt.total_volume_usd;
+  //       // Preserve existing tvl_usd and apr, which are updated in the lp_and_transfers subscription
+  //     } else {
+  //       combinedPoolMetrics.push({ ...rt });
+  //     }
+  //   });
 
-    setPoolMetricsData(combinedPoolMetrics);
-  }, [historicalPoolMetricsData, realTimePoolMetricsData]);
+  //   setPoolMetricsData(combinedPoolMetrics);
+  // }, [historicalPoolMetricsData, realTimePoolMetricsData]);
 
   // Provide the context value
   const value: DataContextType = {
@@ -1019,7 +1271,10 @@ setMaxTxPerHour(500); // Adjust as needed
     realTimeLoading,
   };
 
-  return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
+  return <DataContext.Provider value={value}>
+    {children}
+    <ToastContainer />
+  </DataContext.Provider>;
 };
 
 export const useData = () => {

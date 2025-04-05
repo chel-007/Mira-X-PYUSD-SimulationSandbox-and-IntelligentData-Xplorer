@@ -1,4 +1,3 @@
-// ChartWrapper.tsx
 import React from 'react';
 import styles from '../../styles/Explore.module.css';
 
@@ -25,7 +24,6 @@ const ChartWrapper: React.FC<ChartWrapperProps> = ({
   onPan,
   onDownload,
 }) => {
-  // Add hasControls class if either extraControls or chartControls is shown
   const headerClass = `${styles.chartHeader} ${showExtraControls || showChartControls ? styles.hasControls : ''}`;
 
   return (

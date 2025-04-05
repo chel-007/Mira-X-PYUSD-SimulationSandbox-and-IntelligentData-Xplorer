@@ -22,7 +22,7 @@ exports.syncToBigQuery = functions.https.onRequest(async (req, res) => {
     res.status(200).send("Sync completed for both collections.");
     return null;
   } catch (error) {
-    console.error("❌ Error in Firestore to BigQuery sync:", error);
+    console.error("Error in Firestore to BigQuery sync:", error);
     if (error.errors) {
       console.error("Detailed errors:");
       error.errors.forEach((err, index) => {
@@ -67,15 +67,14 @@ async function syncCollection(collectionName, tableName, mapFunction) {
   console.log(`${collectionName}: Deleted ${logs.length} synced docs from Firestore`);
 }
 
-// Mapping function for transfer_transactions
 function mapTransferLog(data) {
   return {
     tx_hash: data.txHash,
     sender: data.sender,
     receiver: data.receiver,
-    value: data.value, // Matches FLOAT64
+    value: data.value,
     block_number: data.blockNumber,
-    timestamp: new Date(data.timestamp).getTime() // Matches INTEGER
+    timestamp: new Date(data.timestamp).getTime()
   };
 }
 

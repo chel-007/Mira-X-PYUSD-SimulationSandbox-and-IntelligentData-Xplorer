@@ -146,16 +146,17 @@ export async function GET() {
       event_type,
       AVG(CAST(gas_used AS INT64) * CAST(gas_price AS BIGNUMERIC) / 1e18) AS avg_gas_fee_eth,
       COUNT(DISTINCT tx_hash) AS transaction_count,
-      ARRAY_AGG(tx_hash) AS tx_hashes
+      ARRAY_AGG(tx_hash) AS tx_hash
     FROM \`${projectId}.pyusd_data.lp_activity_and_gas_latest\`
     WHERE event_type IN ('Transfer', 'Swap')
-      AND DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) >= DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY)
+      AND DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
 
     GROUP BY event_date, event_type
     ORDER BY event_date, event_type
   `;
 
-        // AND DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) < CURRENT_DATE()
+  // AND DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) < CURRENT_DATE()
+
     const timeOfDayQuery = `
     SELECT
       DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) AS event_date,
@@ -168,6 +169,7 @@ export async function GET() {
     ORDER BY event_date, hour_of_day;
     `
 
+    // AND DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) < CURRENT_DATE()
     // const gasFeeVolatilityQuery = `
     // SELECT
     //   DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) AS event_date,
@@ -272,9 +274,9 @@ export async function GET() {
     // }));
 
     // console.log(swapVolumeData)
-    console.log(timeOfDayData)
-    console.log("gas", gasComparisonData)
-    // console.log(totalWallets)
+    // console.log(timeOfDayData)
+    // console.log("gas", gasComparisonData)
+    console.log(poolMetricsData)
 
     return NextResponse.json({
       dailyData,

@@ -1,12 +1,9 @@
 "use client"
-
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import styles from "../styles/Explore.module.css";
 import style1 from "../styles/Home.module.css";
 import "../globals.css";
 import { useRouter } from 'next/navigation';
-import { collection, onSnapshot, QuerySnapshot, DocumentData } from "firebase/firestore";
-import { db } from "../lib/clientFirestore";
 import TransactionChart from "../components/explore/TransactionChart";
 import VelocityChart from "../components/explore/VelocityChart";
 import ActiveWalletsChart from "../components/explore/ActiveWalletsChart";
@@ -16,9 +13,7 @@ import TimeOfDayChart from "../components/explore/TimeOfDayChart";
 import ChartWrapper from "../components/explore/ChartWrapper";
 import SwapVolumeChart from "../components/explore/SwapVolumeChart";
 import PoolMetricsChart from "../components/explore/PoolMetricsChart";
-import { useEthPrice } from "../utils/EthPriceProvider";
 import { useData } from "../utils/DataProvider";
-import * as d3 from "d3";
 
 
 const Explore = () => {
@@ -59,7 +54,6 @@ const Explore = () => {
 
   return (
     <div className={styles.container}>
-      {/* Top Bar (unchanged) */}
       <div className={styles.topBar}>
         <div className={styles.appContainer}>
           <h1 className={style1.appName}>
@@ -114,23 +108,16 @@ const Explore = () => {
                   />
                 </ChartWrapper>
   
-              {/* Right Side: WalletGrowthChart on top, ActiveWalletsChart and VelocityChart side by side below */}
               <div className={styles.rightSide}>
                 <ChartWrapper
                   title="Wallet Growth Rate"
                   loading={loading}
-                  showExtraControls={true}
-                  showChartControls={true}
-                  onZoom={() => console.log("Zoom clicked")} // Temporary for testing
-                  onPan={() => console.log("Pan clicked")}
-                  onDownload={() => console.log("Download clicked")}
+                  showExtraControls={false}
+                  showChartControls={false}
                 >
                   <WalletGrowthChart
                   walletGrowthData={walletGrowthData}
                   key={walletGrowthData.length}
-                  onZoom={() => console.log("Zoom passed to SwapVolumeChart")}
-                  onPan={() => console.log("Pan passed to SwapVolumeChart")}
-                  onDownload={() => console.log("Download passed to SwapVolumeChart")}
                    />
                 </ChartWrapper>
   
@@ -160,7 +147,7 @@ const Explore = () => {
           {activeTab === "defi" && (
             <>
               <ChartWrapper
-                title="Swap Volume (Current)"
+                title="Swap Volume (30 days)"
                 loading={loading}
                 showExtraControls={true}
                 showChartControls={true}
@@ -175,7 +162,8 @@ const Explore = () => {
                 showExtraControls={true}
                 showChartControls={true}
               >
-                <PoolMetricsChart poolMetricsData={poolMetricsData} />
+                <PoolMetricsChart
+                poolMetricsData={poolMetricsData} />
               </ChartWrapper>
             </>
           )}
@@ -183,19 +171,13 @@ const Explore = () => {
           {activeTab === "gas" && (
             <>
               <ChartWrapper
-                title="Gas Comparision (Transfer vs Swaps)"
+                title="Gas Comparision (Avg)"
                 loading={loading}
                 showExtraControls={false}
                 showChartControls={false}
-                onZoom={() => console.log("Zoom clicked")} // Temporary for testing
-                onPan={() => console.log("Pan clicked")}
-                onDownload={() => console.log("Download clicked")}
             >
               <GasFeesChart
                 gasFeeData={gasFeeData}
-                onZoom={() => console.log("Zoom passed to SwapVolumeChart")}
-                onPan={() => console.log("Pan passed to SwapVolumeChart")}
-                onDownload={() => console.log("Download passed to SwapVolumeChart")}
               />
               </ChartWrapper>
               <ChartWrapper
@@ -213,7 +195,6 @@ const Explore = () => {
         </div>
       </div>
   
-      {/* Tabs (unchanged) */}
       <div className={styles.tabs}>
         <button
           className={activeTab === "adoption" ? styles.activeTab : styles.tab}

@@ -57,11 +57,11 @@
   align-items: center;
   color: #7BCFFF;
   font-weight: 200;
-  font-size: clamp(10px, 1.5vw, 13px); /* Scales between 10px and 13px */
+  font-size: clamp(10px, 1.5vw, 13px);
   background-color: rgba(129, 132, 153, 0.15);
-  padding: clamp(5px, 1vw, 10px) clamp(8px, 1.5vw, 15px); /* Scales padding */
+  padding: clamp(5px, 1vw, 10px) clamp(8px, 1.5vw, 15px);
   border-radius: 10px;
-  white-space: nowrap; /* Keep for now, adjust below */
+  white-space: nowrap; 
   border: 0.2px solid rgba(129, 132, 153, 0.15);
 }
 
@@ -73,10 +73,10 @@
 /* Small screens adjustments */
 @media (max-width: 750px) {
   .sandboxStatus {
-    font-size: clamp(8px, 1.2vw, 10px); /* Smaller range */
-    padding: 6px 10px; /* Fixed small padding */
-    white-space: normal; /* Allow wrapping if needed */
-    text-align: center; /* Center text if it wraps */
+    font-size: clamp(8px, 1.2vw, 10px); 
+    padding: 6px 10px;
+    white-space: normal;
+    text-align: center;
   }
 }
 
@@ -93,11 +93,9 @@
   padding: 10px;
   position: relative;
   display: flex;
-  /* gap: 10px; */
   overflow: hidden;
 }
 
-/* Dashboard: Unchanged except minor tweaks */
 .dashboard {
   display: flex;
   flex-direction: column;
@@ -109,7 +107,6 @@
   border-radius: 10% 0% 0% 10%;
 }
 
-/* Card: Unchanged */
 .card {
   background: #010214;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -148,12 +145,10 @@
   color: #1a1a1a;
 }
 
-/* Back: Adjusted for relative positioning */
 .back {
   margin-right: 15px;
 }
 
-/* Canvas: Unchanged */
 .canvas {
   flex-grow: 1;
   position: relative;
@@ -164,15 +159,15 @@
 /* Media query for extra small screens */
 @media (max-width: 750px) {
   .dashboard {
-    width: 30%; /* Wider relative width on tiny screens */
-    min-width: 100px; /* Smaller minimum */
+    width: 30%;
+    min-width: 100px;
   }
 
   .card.active {
-    width: calc(100% + 10px); /* Less overhang on small screens */
+    width: calc(100% + 10px); 
   }
 
   .card h2 {
-    font-size: clamp(0.875rem, 2vw, 1.25rem); /* Smaller range */
+    font-size: clamp(0.875rem, 2vw, 1.25rem);
   }
 }

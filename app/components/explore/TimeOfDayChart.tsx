@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useLayoutEffect } from "react";
 import * as d3 from "d3";
-import styles from "../../styles/Explore.module.css";
 
 interface TimeOfDayData {
   event_date: string;
@@ -64,16 +63,14 @@ const TimeOfDayChart: React.FC<TimeOfDayChartProps> = ({ timeOfDayData }) => {
 
     // Ensure inner dimensions are positive
     if (innerWidth <= 0 || innerHeight <= 0) {
-      console.warn("Invalid inner dimensions:", { innerWidth, innerHeight });
+      // console.warn("Invalid inner dimensions:", { innerWidth, innerHeight });
       return;
     }
 
-    // Only clear the SVG on the first render
     if (isFirstMount.current) {
       svg.selectAll("*").remove();
     }
 
-    // Fill in missing hours for each day
     const dates = Array.from(new Set(timeOfDayData.map(d => d.event_date))).sort();
     const hours = Array.from({ length: 24 }, (_, i) => i); // 0-23
     const completeData: TimeOfDayData[] = [];
@@ -123,7 +120,7 @@ const TimeOfDayChart: React.FC<TimeOfDayChartProps> = ({ timeOfDayData }) => {
       .padding(0.05);
 
     // Filter dates for y-axis ticks (every 3 days)
-    const tickInterval = 3; // Show every 3rd day
+    const tickInterval = 3;
     const filteredDates = dates.filter((_, i) => i % tickInterval === 0);
 
     // Log bandwidths to debug

@@ -12,7 +12,7 @@ const port = process.env.PORT || 8080;
 const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 const CURVE_SWAP_TOPIC = '0x8b3e96f2b889fa771c53c981b40daf005f63f637f1869f707052d15a3dd97140';
 
-// Addresses (lowercase for consistency in comparisons)
+// Addresses (lowercase for consistency in comparisons
 const PYUSD_ADDRESS = '0x6c3ea9036406852006290770bedfcaba0e23a0e8'.toLowerCase();
 const CURVE_POOL_1 = '0x383e6b4437b59fff47b619cba855ca29342a8559'.toLowerCase();
 const CURVE_POOL_2 = '0x625e92624bc2d88619accc1788365a69767f6200'.toLowerCase();
@@ -22,7 +22,7 @@ const blockTimestampCache = new Map();
 
 // Batch writing configuration
 const BATCH_SIZE = 10;
-const WRITE_INTERVAL_MS = 5000; // 50 seconds
+const WRITE_INTERVAL_MS = 5000;
 let pendingWrites = [];
 let writeTimeout = null;
 
@@ -36,7 +36,7 @@ async function fetchWithRetry(method, params, retries = 3, delay = 1000) {
   for (let i = 0; i < retries; i++) {
     try {
       const response = await fetch(
-        "https://blockchain.googleapis.com/v1/projects/mirax-beta/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=apikey",
+        "https://blockchain.googleapis.com/v1/projects/projectid/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=apikey",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -93,26 +93,26 @@ async function getTransactionDetails(txHash) {
     fetchWithRetry("eth_getTransactionByHash", [txHash]),
     fetchWithRetry("eth_getTransactionReceipt", [txHash]),
   ]);
-  // Fallback values if fetch fails
+
   const safeTx = tx || {};
   const safeReceipt = receipt || {};
 
-  const gasPriceRaw = safeTx.gasPrice || "0x0"; // Default to 0 if missing
-  const gasUsedRaw = safeReceipt.gasUsed || "0x0"; // Default to 0 if missing
+  const gasPriceRaw = safeTx.gasPrice || "0x0";
+  const gasUsedRaw = safeReceipt.gasUsed || "0x0";
 
   const gasPrice = parseInt(gasPriceRaw, 16);
   const gasUsed = parseInt(gasUsedRaw, 16);
 
-  // Log invalid data for debugging
+
   if (isNaN(gasPrice) || isNaN(gasUsed)) {
     console.warn(`Invalid gas data for tx ${txHash}`, { gasPriceRaw, gasUsedRaw });
   }
 
   return {
     input: safeTx.input || '0x',
-    gasPrice: isNaN(gasPrice) ? 0 : gasPrice, // Fallback to 0
-    gasUsed: isNaN(gasUsed) ? 0 : gasUsed,    // Fallback to 0
-    status: parseInt(safeReceipt.status || "0x1", 16), // Assume success if missing
+    gasPrice: isNaN(gasPrice) ? 0 : gasPrice,
+    gasUsed: isNaN(gasUsed) ? 0 : gasUsed, 
+    status: parseInt(safeReceipt.status || "0x1", 16),
     fromAddress: safeTx.from ? safeTx.from.toLowerCase() : null,
     toAddress: safeTx.to ? safeTx.to.toLowerCase() : null,
   };
@@ -186,7 +186,7 @@ async function batchWriteToFirestore() {
 
   try {
     const batch = firestore.batch();
-    const eventsToWrite = pendingWrites.splice(0, BATCH_SIZE); // Take up to BATCH_SIZE events
+    const eventsToWrite = pendingWrites.splice(0, BATCH_SIZE);
     for (const { collection, docId, data } of eventsToWrite) {
       batch.set(collection.doc(docId), data);
     }
@@ -198,7 +198,7 @@ async function batchWriteToFirestore() {
       await batchWriteToFirestore();
     }
   } catch (error) {
-    console.error("❌ Error writing batch to Firestore:", error);
+    console.error("Error writing batch to Firestore:", error);
     // Add failed events back to pendingWrites for retry
     pendingWrites.unshift(...eventsToWrite);
   }
@@ -285,7 +285,6 @@ function attachWebSocketHandlers(ws) {
         const timestampMs = await getBlockTimestamp(blockNumberHex);
         const timestamp = new Date(timestampMs).toISOString();
 
-        // Always store in transfer_transactions
         const txData = {
           txHash,
           sender,
@@ -319,38 +318,37 @@ function attachWebSocketHandlers(ws) {
           docId: `${txHash}-${logData.logIndex}`,
           data: eventData,
         });
-        console.log(`✅ Processed Curve Swap: ${txHash} | Pool: ${address}`);
+        console.log(`Processed Curve Swap: ${txHash} | Pool: ${address}`);
       }
       // Schedule a batch write
       scheduleBatchWrite();
     } catch (error) {
-      console.error("❌ Error processing WebSocket message:", error);
+      console.error("Error processing WebSocket message:", error);
     }
   });
 
   ws.on('error', (error) => {
-    console.error('❌ WebSocket error:', error.message);
+    console.error('WebSocket error:', error.message);
     console.log('🔄 Reconnecting due to error...');
     ws.close();
   });
 
   ws.on('close', () => {
-    console.log('🔄 WebSocket closed, reconnecting...');
+    console.log('WebSocket closed, reconnecting...');
     if (writeTimeout) {
       clearTimeout(writeTimeout);
       writeTimeout = null;
     }
-    // Write any remaining events before reconnecting
     batchWriteToFirestore().then(() => {
-      pendingWrites = []; // Clear pending writes after writing
+      pendingWrites = [];
       setTimeout(startWebSocket, 2000);
     });
   });
 }
 
 function startWebSocket() {
-  console.log('🚀 Starting WebSocket connection...');
-  const ws = new WebSocket("wss://blockchain.googleapis.com/v1/projects/mirax-beta/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=apikey");
+  console.log('Starting WebSocket connection...');
+  const ws = new WebSocket("wss://blockchain.googleapis.com/v1/projects/projectid/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=apikey");
   attachWebSocketHandlers(ws);
 }
 
@@ -377,7 +375,7 @@ app.listen(port, () => {
 // });
 
 // async function getBlockTimestamp(blockNumberHex) {
-//   const response = await fetch("https://blockchain.googleapis.com/v1/projects/mirax-beta/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=AIzaSyBHUjd0OL8Xj1HB-j12O_hxc8mdrOGRiRY", {
+//   const response = await fetch("https://blockchain.googleapis.com/v1/projects/projectid/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=apikey", {
 //     method: "POST",
 //     headers: { "Content-Type": "application/json" },
 //     body: JSON.stringify({
@@ -408,7 +406,7 @@ app.listen(port, () => {
 //         ],
 //       })
 //     );
-//     // setInterval(() => console.log("💓 WebSocket still alive"), 60000);
+//     // setInterval(() => console.log("WebSocket still alive"), 60000);
 //   });
 
 //   ws.on("message", async (data) => {
@@ -417,7 +415,7 @@ app.listen(port, () => {
 //       const logData = log.params?.result;
 
 //       if (!logData || !logData.topics || logData.topics.length < 3) {
-//         console.log("⚠️ Invalid log format or missing topics:", logData);
+//         console.log("Invalid log format or missing topics:", logData);
 //         return;
 //       }
 
@@ -436,7 +434,7 @@ app.listen(port, () => {
 
 //       const txData = { txHash, sender, receiver, value, timestamp, blockNumber };
 //       await txCollection.doc(txHash).set(txData);
-//       console.log(`✅ Uploaded TX: ${txHash} | ${sender} → ${receiver} | Amount: ${value}`);
+//       console.log(`Uploaded TX: ${txHash} | ${sender} → ${receiver} | Amount: ${value}`);
 //     } catch (error) {
 //       console.error("❌ Error processing WebSocket message:", error);
 //     }
@@ -444,19 +442,19 @@ app.listen(port, () => {
 
 //   ws.on('error', (error) => {
 //     console.error('❌ WebSocket error:', error.message);
-//     console.log('🔄 Reconnecting due to error...');
+//     console.log('Reconnecting due to error...');
 //     ws.close();
 //     setTimeout(startWebSocket, 2000);
 //   });
 
 //   ws.on('close', () => {
-//     console.log('🔄 WebSocket closed, reconnecting...');
+//     console.log('WebSocket closed, reconnecting...');
 //     setTimeout(startWebSocket, 2000);
 //   });
 // }
 
 // function startWebSocket() {
-//   console.log('🚀 Starting WebSocket connection...');
+//   console.log('Starting WebSocket connection...');
 //   const ws = new WebSocket("wss://blockchain.googleapis.com/v1/projects/mirax-beta/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=AIzaSyBHUjd0OL8Xj1HB-j12O_hxc8mdrOGRiRY");
 //   attachWebSocketHandlers(ws);
 // }

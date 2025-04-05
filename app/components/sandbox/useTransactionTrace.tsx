@@ -1,6 +1,8 @@
 // components/sandbox/useTransactionTrace.tsx
 "use client"
 import { useState } from 'react';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const gcpProjectId = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT_ID;
 const gcpApiKey = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_KEY;
@@ -17,6 +19,15 @@ export const useTransactionTrace = () => {
   const fetchTraceAndReceipt = async (txHash: string) => {
     if (!txHash || !/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
       setError(new Error('Invalid transaction hash'));
+              toast.error("Invalid transaction hash!", {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+              });
+
       return;
     }
 

@@ -2,10 +2,20 @@ import React from 'react';
 import styles from './styles/TelegramButton.module.css'; // Import CSS module
 
 const TelegramButton = ({ isOpen, onClick }) => {
+  const handleClick = () => {
+    // Toggle isOpen as before
+    onClick();
+
+    // Launch Telegram bot only when opening (or when already open, depending on your intent)
+    if (isOpen) {
+      window.open('https://t.me/MiraXInsightsBot', '_blank');
+    }
+  };
+
   return (
     <div
       className={`${styles.telegramButton} ${isOpen ? styles.open : styles.closed}`}
-      onClick={onClick}
+      onClick={handleClick}
     >
       {isOpen ? (
         <>

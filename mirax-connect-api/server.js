@@ -27,7 +27,7 @@ try {
   console.log('Firebase Admin initialized successfully');
 } catch (error) {
   console.error('Failed to initialize Firebase Admin:', error);
-  process.exit(1); // Exit if initialization fails
+  process.exit(1);
 }
 const collectionName = process.env.FIRESTORE_COLLECTION;
 const REQUIRED_TOKEN = process.env.REQUIRED_TOKEN;
@@ -98,7 +98,6 @@ const poolMetricsQuery = `
       GROUP BY pool_address
 `;
 
-// Fetch BigQuery data every 30 minutes
 async function fetchBigQueryData() {
   try {
     console.log('Fetching BigQuery data...');
@@ -150,7 +149,7 @@ function updateInsights(realTimeData) {
   // Fetch BigQuery data if Firestore is empty
   if (realTimeData.length === 0) {
     console.log('Firestore collection is empty, fetching fresh BigQuery data...');
-    fetchBigQueryData(); // Synchronous call; insights will use latest cachedData
+    fetchBigQueryData();
   }
 
   const oneHourAgo = Math.floor((Date.now() - 60 * 60 * 1000) / 1000);
@@ -183,7 +182,7 @@ function generateInsights(cachedData, realTimeData) {
     event_date: new Date(doc.block_timestamp * 1000).toISOString().split('T')[0],
     hour_of_day: new Date(doc.block_timestamp * 1000).getUTCHours(),
     avg_gas_fee_eth: doc.gas_used * doc.gas_price / 1e18, // Per-transaction fee
-    transaction_count: 1 // Each doc is one tx
+    transaction_count: 1
   }));
 
   // Combine BigQuery and Firestore data, filter to 7 days
@@ -207,7 +206,7 @@ function generateInsights(cachedData, realTimeData) {
       ? sevenDayWindow[hour].total / sevenDayWindow[hour].count
       : overallAvg;
   }
-  console.log('7-day avg gas fees per hour (blended):', sevenDayAvg);
+  // console.log('7-day avg gas fees per hour (blended):', sevenDayAvg);
 
   const currentHour = new Date().getUTCHours();
   const currentFee = sevenDayAvg[currentHour] || overallAvg;
@@ -241,7 +240,7 @@ const lastHourFees = realTimeData
   }))
   .sort((a, b) => a.timestamp - b.timestamp)
   .map((d) => d.fee);
-console.log('lastHourFees (sorted, non-zero):', lastHourFees);
+// console.log('lastHourFees (sorted, non-zero):', lastHourFees);
 
 const avgLastHour = lastHourFees.length > 0 
   ? lastHourFees.reduce((sum, fee) => sum + fee, 0) / lastHourFees.length 
@@ -250,7 +249,7 @@ const avgLastHour = lastHourFees.length > 0
 const earlyHourFees = realTimeData
   .filter((d) => d.block_timestamp >= oneHourAgo && d.block_timestamp < thirtyMinsAgo && d.gas_used > 0 && d.gas_price > 0)
   .map((d) => d.gas_used * d.gas_price / 1e18);
-console.log('earlyHourFees:', earlyHourFees); // Debug early fees
+// console.log('earlyHourFees:', earlyHourFees);
 const earliestLastHour = earlyHourFees.length > 0 
   ? earlyHourFees.reduce((sum, fee) => sum + fee, 0) / earlyHourFees.length 
   : avgLastHour;
@@ -275,8 +274,8 @@ const gasTrend = lastHourFees.length > 0
   // --- Best Pool Selection ---
 // Pool address to name mapping
 const poolNames = {
-  '0x625e92624bc2d88619accc1788365a69767f6200': 'Curve Pool',
-  '0x383e6b4437b59fff47b619cba855ca29342a8559': 'Uniswap Pool'
+  '0x625e92624bc2d88619accc1788365a69767f6200': 'Curve py/crv Pool',
+  '0x383e6b4437b59fff47b619cba855ca29342a8559': 'Curve PayPool'
 };
 
 // Function to truncate address

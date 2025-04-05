@@ -13,7 +13,7 @@ FROM `bigquery-public-data.goog_blockchain_ethereum_mainnet_us.logs`
 WHERE
   address = '0x6c3ea9036406852006290770bedfcaba0e23a0e8'
   AND topics[SAFE_OFFSET(0)] = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
-  AND block_number BETWEEN 18920525 AND 22001511  -- Update to your cutoff
+  AND block_number BETWEEN 18920525 AND 22001511
 ORDER BY block_number
 """
 job = client.query(query)
@@ -21,7 +21,7 @@ df = job.to_dataframe()
 
 table_ref = client.dataset("pyusd_data").table("transfer_logs")
 job_config = bigquery.LoadJobConfig(
-    write_disposition="WRITE_TRUNCATE",  # Overwrites existing rows
+    write_disposition="WRITE_TRUNCATE", 
     schema=[
         bigquery.SchemaField("tx_hash", "STRING"),
         bigquery.SchemaField("sender", "STRING"),

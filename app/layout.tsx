@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
 import "./globals.css";
 import { EthPriceProvider } from "./utils/EthPriceProvider";
 import { DataProvider } from "./utils/DataProvider";
 
 export const metadata: Metadata = {
   title: "PYUSD",
-  description: "stability adoption tool 2025",
+  description: "realtime edge in pyusd transactions. mirax beta 2025!",
 };
 
 export default function RootLayout({
@@ -61,8 +60,7 @@ export default function RootLayout({
       />
       </head>
       <body
-        // className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        style={{ fontFamily: 'Roboto, sans-serif' }} // Apply the Google Font
+        style={{ fontFamily: 'Roboto, sans-serif' }}
       >
         <EthPriceProvider>
         <DataProvider>

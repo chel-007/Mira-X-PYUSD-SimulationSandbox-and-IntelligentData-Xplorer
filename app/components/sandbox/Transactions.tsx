@@ -275,7 +275,7 @@ const transactionInputs = {
   ],
   Swap: [
     { label: 'From', xOffset: 0, yOffset: 50 },
-    { label: 'Select Pair', type: 'selector', options: ['USDT to PYUSD', 'USDC to PYUSD', 'crvUSD to PYUSD'], xOffset: 200, yOffset: 50 },
+    { label: 'Select Pair', type: 'selector', options: ['USDC to PYUSD', 'crvUSD to PYUSD'], xOffset: 200, yOffset: 50 },
     // { label: 'To', xOffset: 400, yOffset: 50 },
     { label: 'AmountIn', xOffset: 0, yOffset: 150 },
     { label: 'AmountOut', xOffset: 400, yOffset: 50 },
@@ -443,18 +443,19 @@ const InputNode = ({ data, id }) => {
 
 const MockButtonNode = ({ data, id }) => {
   const [loading, setLoading] = useState(false);
-  const { simulateTransfer, simulateSwap } = useTransactionSimulation(data.rpcUrl);
+  const [isSimulated, setIsSimulated] = useState(false);
+  const { simulateTransfer, sendTransfer, simulateSwap } = useTransactionSimulation(data.rpcUrl);
   const { setSimulationResult, clearSimulation } = useSimulation();
   const isSwap = data.inputs?.AmountIn;
 
-  console.log("amountin?",data.inputs?.AmountIn);
-  console.log("inputs?",data.inputs);
+  // console.log("amountin?",data.inputs?.AmountIn);
+  // console.log("inputs?",data.inputs);
 
   const handleMock = async () => {
     setLoading(true);
     clearSimulation();
     const { From, To, Amount, AmountIn, AmountOut, inputToken } = data.inputs || {};
-    console.log("inputtoken", inputToken)
+    // console.log("inputtoken", inputToken)
 
     if (isSwap) {
       if (!From || !AmountIn || !inputToken) {
@@ -464,13 +465,13 @@ const MockButtonNode = ({ data, id }) => {
       }
       try {
         const result = await simulateSwap(
-          From,              // from
-          To || From,        // to (default to sender if not provided)
-          String(AmountIn),  // amountIn (ensure string)
-          data.isMainnet,    // isMainnet
-          inputToken         // tokenIn
+          From, 
+          To || From,
+          String(AmountIn),
+          data.isMainnet,
+          inputToken
         );
-        console.log("simulation result", result)
+        // console.log("simulation result", result)
         setSimulationResult(result);
         // setNodes((nds) =>
         //   nds.map((node) =>
@@ -491,11 +492,21 @@ const MockButtonNode = ({ data, id }) => {
         return;
       }
       try {
-        const result = await simulateTransfer(From, To, String(Amount), data.isMainnet);
-        console.log('Transfer Simulation Result:', result);
-        setSimulationResult(result);
+        if (!isSimulated) {
+          const result = await simulateTransfer(From, To, String(Amount), data.isMainnet);
+          console.log('Transfer Simulation Result:', result);
+          setSimulationResult(result);
+          setIsSimulated(true); // Switch to Send mode
+        } else {
+          // Send
+          setSimulationResult({ status: 'Sending now' }); // Temp state for SimulationResultBox
+          const { txHash } = await sendTransfer(To, String(Amount), data.isMainnet);
+          setSimulationResult({ txHash, status: 'Sent' }); // Update with txHash
+          toast.success('Transfer successful!', { position: 'top-right' });
+        }
       } catch (error) {
-        setSimulationResult({ error: error.message });
+        console.error('Action error:', error);
+        setSimulationResult({ error: `Transfer failed: ${error.message}` });
       } finally {
         setLoading(false);
       }
@@ -506,7 +517,7 @@ const MockButtonNode = ({ data, id }) => {
     <div className={styles.mockButtonNode}>
       <Handle type="target" position={Position.Top} style={{ background: '#00ffcc' }} />
       <button onClick={handleMock} disabled={loading} style={{ background: 'green' }}>
-        {loading ? <i className="fa-spin fa-spinner" /> : isSwap ? 'Simulate Swap' : 'Simulate'}
+      {loading ? <i className="fa-spin fa-spinner" /> : isSimulated ? 'Send' : 'Simulate'}
       </button>
       <Handle type="source" position={Position.Bottom} style={{ background: '#00ffcc' }} />
     </div>
@@ -533,24 +544,36 @@ const nodeTypes = {
 const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, setEdges: any, nodes: CustomNode[], edges: Edge[] }) => {
   const { trace, receipt, loading, error, resetTrace, fetchTrace } = useTransactionTrace();
   const { setSimulationResult, clearSimulation } = useSimulation();
+  const { setIsMainnet } = useSimulation();
+  const chainId = useChainId();
+  useEffect(() => {
+    setIsMainnet(chainId === 1); // true for mainnet, false for Sepolia
+  }, [chainId, setIsMainnet]);
   const [fetchingNodeId, setFetchingNodeId] = useState(null);
   const { setCenter } = useReactFlow();
-  const chainId = useChainId();
   const { address } = useAccount();
   const { timeOfDay, gasFeeData, poolMetricsData } = useData();
     const { ethPrice, loading: ethPriceLoading } = useEthPrice();
   const [mockInputs, setMockInputs] = useState({});
-  const [amountNodeId, setAmountNodeId] = useState(null); // Track Amount node ID
+  const [amountNodeId, setAmountNodeId] = useState(null);
 
   const isMainnet = chainId === 1;
   const isSepolia = chainId === 11155111;
   const rpcUrl = isMainnet ? MAINNET_RPC_URL : SEPOLIA_RPC_URL;
   const isWalletConnected = !!address; // True if address is defined, false if undefined
 
-  // useEffect(() => {
-  //   console.log(`Wallet connected to ${isMainnet ? 'Mainnet' : isSepolia ? 'Sepolia' : 'Unknown'}, RPC: ${rpcUrl}`);
-  //   console.log("address", address)
-  // }, [chainId]);
+  useEffect(() => {
+    // console.log(`Wallet connected to ${isMainnet ? 'Mainnet' : isSepolia ? 'Sepolia' : 'Unknown'}, RPC: ${rpcUrl}`);
+    // console.log("address", address)
+    toast.info(`Connected network changed! ${isMainnet ? 'Mainnet' : isSepolia ? 'Sepolia' : 'Unknown'}`, {
+      position: "top-right",
+      autoClose: 5000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+    });
+  }, [chainId]);
 
   // Validate Ethereum address
   const isValidEthAddress = (addr) => /^0x[a-fA-F0-9]{40}$/.test(addr);
@@ -1212,7 +1235,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
         pauseOnFocusLoss
         draggable
         pauseOnHover
-        style={{ zIndex: 10000 }} // Inline z-index increase
+        style={{ zIndex: 10000 }}
       />
         <LatestTxScroller />
       </ReactFlow>

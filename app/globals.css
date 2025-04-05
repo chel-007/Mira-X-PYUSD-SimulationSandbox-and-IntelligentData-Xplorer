@@ -27,8 +27,8 @@ body {
 html, body {
   margin: 0;
   padding: 0;
-  height: 100vh; /* Ensure the body takes the full viewport height */
-  overflow: hidden; /* Prevent scrolling on the body */
+  height: 100vh;
+  overflow: hidden;
 }
 .react-flow__node-input {
   background: #010214 !important;
@@ -63,5 +63,38 @@ html, body {
   background: rgba(129, 132, 153, 0.02) !important;
 }
 .react-flow__background circle {
-  fill: rgba(255, 255, 255, 0.1) !important; /* Subtle dots */
+  fill: rgba(255, 255, 255, 0.1) !important;
+}
+
+
+.Toastify__toast--info {
+  background: rgba(129, 132, 153, 0.1) !important;
+  border: 1px solid #7bcfff !important;
+  border-radius: 4px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  color: #999999 !important;
+  font-family: "Josefin Sans", sans-serif !important;
+  font-size: 0.9em !important;
+}
+
+.Toastify__toast--success {
+  background: rgba(129, 132, 153, 0.1) !important;
+  border: 1px solid #7bcfff !important;
+  border-radius: 4px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  color: #999999 !important;
+  font-family: "Josefin Sans", sans-serif !important;
+  font-size: 0.9em !important;
+}
+
+.Toastify__toast--info .Toastify__toast-icon {
+  color: #7bcfff !important;
+}
+
+.Toastify__toast--info .Toastify__close-icon {
+  color: #7bcfff !important;
+}
+
+.Toastify__toast--info .Toastify__progress-bar {
+  background: #7bcfff9d !important;
 }

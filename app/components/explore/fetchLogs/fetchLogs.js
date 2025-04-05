@@ -4,14 +4,13 @@ require('dotenv').config();
 
 
 const firestore = new Firestore();
-const txCollection = firestore.collection('transfer_transactions'); 
+const txCollection = firestore.collection(''); 
 
 const gcpProjectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
 const gcpApiKey = process.env.GOOGLE_CLOUD_KEY;
 
 const ws = new WebSocket(`wss://blockchain.googleapis.com/v1/projects/${gcpProjectId}/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=${gcpApiKey}`);
 
-// Helper function to fetch block timestamp
 async function getBlockTimestamp(blockNumberHex) {
     const response = await fetch(`https://blockchain.googleapis.com/v1/projects/${gcpProjectId}/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=${gcpApiKey}`, {
       method: "POST",
@@ -51,12 +50,12 @@ async function getBlockTimestamp(blockNumberHex) {
       const logData = log.params?.result;
   
       if (!logData || !logData.topics || logData.topics.length < 3) {
-        console.log("⚠️ Invalid log format or missing topics:", logData);
+        console.log("Invalid log format or missing topics:", logData);
         return;
       }
 
-      const rawValue = BigInt(logData.data); // e.g., 1434320000n
-      const adjustedValue = Number(rawValue) / 1_000_000; // e.g., 1434.32
+      const rawValue = BigInt(logData.data);
+      const adjustedValue = Number(rawValue) / 1_000_000;
   
       const txHash = logData.transactionHash;
       const sender = "0x" + logData.topics[1].slice(26);
@@ -80,10 +79,10 @@ async function getBlockTimestamp(blockNumberHex) {
   
       // Upload to Firestore
       await txCollection.doc(txHash).set(txData);
-        console.log(`✅ Uploaded TX: ${txHash} | ${sender} → ${receiver} | Amount: ${value}`);
+        console.log(`Uploaded TX: ${txHash} | ${sender} → ${receiver} | Amount: ${value}`);
         // console.log(logData)
     
     } catch (error) {
-        console.error("❌ Error processing WebSocket message:", error);
+        console.error("Error processing WebSocket message:", error);
     }
 });

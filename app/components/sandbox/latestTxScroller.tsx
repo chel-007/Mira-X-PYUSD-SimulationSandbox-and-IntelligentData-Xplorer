@@ -1,10 +1,29 @@
 // components/sandbox/LatestTxScroller.tsx
 import { useState, useEffect } from "react";
 import { useData } from "../../utils/DataProvider";
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const LatestTxScroller = () => {
   const [latestTxs, setLatestTxs] = useState<string[]>([]);
-  const { transfers } = useData(); // Get real-time transfers from DataProvider
+  const { transfers } = useData();
+
+  const handleCopy = async (textToCopy: string) => {
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      toast.info(`Copied to clipboard`, {
+        position: 'top-right',
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+    } catch (err) {
+      toast.error('Failed to copy to clipboard');
+      console.error('Clipboard error:', err);
+    }
+  };
 
   useEffect(() => {
     if (transfers && transfers.length > 0) {
@@ -20,10 +39,12 @@ const LatestTxScroller = () => {
   // Render the transaction list
   const renderTxList = () =>
     latestTxs.map((tx, index) => (
+      
       <span
         key={`${tx}-${index}`}
         style={{ display: "inline-block", margin: "0 20px", position: "relative" }}
       >
+        
         {index === 0 && (
           <span
             style={{
@@ -44,7 +65,7 @@ const LatestTxScroller = () => {
           {tx.slice(0, 10)}...{tx.slice(-4)}
         </span>
         <button
-          onClick={() => navigator.clipboard.writeText(tx)}
+          onClick={() => handleCopy(tx)}
           style={{
             marginLeft: "5px",
             background: "none",
@@ -59,6 +80,7 @@ const LatestTxScroller = () => {
           <span style={{ margin: "0 10px", color: "#555" }}>|</span>
         )}
       </span>
+      
     ));
 
   return (
@@ -79,7 +101,7 @@ const LatestTxScroller = () => {
         style={{
           display: "inline-block",
           whiteSpace: "nowrap",
-          animation: latestTxs.length > 0 ? "scroll 80s linear infinite" : "none",
+          animation: latestTxs.length > 0 ? "scroll 140s linear infinite" : "none",
         }}
       >
         {renderTxList()}

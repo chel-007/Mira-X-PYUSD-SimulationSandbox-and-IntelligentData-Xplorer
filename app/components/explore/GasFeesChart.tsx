@@ -1,3 +1,326 @@
+
+"use client";
+import React, { useEffect, useRef } from "react";
+import * as d3 from "d3";
+import { gsap } from "gsap";
+
+interface GasFeeOverTimeData {
+  event_date: string;
+  event_type: string;
+  avg_gas_fee_eth: number;
+  avg_gas_fee_usd: number;
+  transaction_count: number;
+}
+
+interface GasFeesChartProps {
+  gasFeeData: GasFeeOverTimeData[];
+  onZoom?: () => void;
+  onPan?: () => void;
+  onDownload?: () => void;
+}
+
+const GasFeesChart: React.FC<GasFeesChartProps> = ({ gasFeeData, onZoom, onPan, onDownload }) => {
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
+  const isFirstMount = useRef(true);
+
+  const colors = {
+    transfer: "#ffd700",
+    swap: "#1E90FF",
+    background: "#010214",
+    text: "rgba(255, 255, 255, 0.1)",
+  };
+
+  // Tooltip setup
+  useEffect(() => {
+    const tooltip = document.createElement("div");
+    tooltip.className = "tooltip";
+    tooltip.style.position = "absolute";
+    tooltip.style.background = "rgba(0, 0, 0, 0.8)";
+    tooltip.style.color = "#fff";
+    tooltip.style.padding = "5px 10px";
+    tooltip.style.borderRadius = "4px";
+    tooltip.style.pointerEvents = "none";
+    tooltip.style.fontSize = "14px";
+    tooltip.style.fontFamily = "Josefin Sans, sans-serif";
+    tooltip.style.fontWeight = '200';
+    tooltip.style.opacity = "0";
+    tooltip.style.zIndex = "1000";
+    document.body.appendChild(tooltip);
+    tooltipRef.current = tooltip;
+
+    return () => {
+      if (tooltipRef.current) {
+        document.body.removeChild(tooltipRef.current);
+        tooltipRef.current = null;
+      }
+    };
+  }, []);
+
+  const renderChart = (data: GasFeeOverTimeData[], width: number, height: number) => {
+    if (!svgRef.current || !containerRef.current || !data.length) return;
+  
+    const svg = d3.select(svgRef.current);
+    const margin = { top: 40, right: 50, bottom: 60, left: 60 };
+    const innerWidth = width - margin.left - margin.right;
+    const innerHeight = height - margin.top - margin.bottom;
+  
+    if (isFirstMount.current) svg.selectAll("*").remove();
+  
+    const g = svg.select("g").empty()
+      ? svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`)
+      : svg.select("g");
+  
+    // Define gradients and effects
+    const defs = svg.select("defs").empty() ? svg.append("defs") : svg.select("defs");
+  
+// Transfer gradient
+const transferGradient = defs.append("linearGradient")
+.attr("id", "transferGradient")
+.attr("x1", "0%").attr("y1", "0%").attr("x2", "100%").attr("y2", "0%");
+transferGradient.append("stop").attr("offset", "0%").attr("stop-color", "#ff831e");
+transferGradient.append("stop").attr("offset", "35%").attr("stop-color", "#ffd700");
+
+// Swap gradient
+const swapGradient = defs.append("linearGradient")
+.attr("id", "swapGradient")
+.attr("x1", "0%").attr("y1", "0%").attr("x2", "100%").attr("y2", "0%");
+swapGradient.append("stop").attr("offset", "0%").attr("stop-color", "#1E90FF");
+swapGradient.append("stop").attr("offset", "90%").attr("stop-color", "#5a9bd3");
+
+// Background gradient
+const bgGradient = defs.append("linearGradient")
+.attr("id", "bgGradient")
+.attr("x1", "0%").attr("y1", "0%").attr("x2", "0%").attr("y2", "100%");
+bgGradient.append("stop").attr("offset", "0%").attr("stop-color", "#010214");
+bgGradient.append("stop").attr("offset", "100%").attr("stop-color", "#020428");
+
+// Glow filter
+const glowFilter = defs.append("filter").attr("id", "glow");
+glowFilter.append("feGaussianBlur").attr("stdDeviation", 2).attr("result", "coloredBlur");
+const feMerge = glowFilter.append("feMerge");
+feMerge.append("feMergeNode").attr("in", "coloredBlur");
+feMerge.append("feMergeNode").attr("in", "SourceGraphic");
+  
+    svg.insert("rect", ":first-child")
+      .attr("width", width).attr("height", height)
+      .attr("fill", "url(#bgGradient)");
+  
+    // svg.selectAll("text.title").remove();
+    // svg.append("text")
+    //   .attr("class", "title")
+    //   .attr("x", width / 2).attr("y", margin.top / 2)
+    //   .attr("text-anchor", "middle").attr("fill", "#fff")
+    //   .attr("font-size", "14px")
+    //   .text("Average Gas Fees Over Time");
+  
+    const dates = Array.from(new Set(data.map(d => d.event_date))).sort();
+    const nestedData = d3.group(data, d => d.event_date);
+    const x = d3.scaleBand().domain(dates).range([0, innerWidth]).padding(0.1);
+    const maxGasFee = d3.max(data, d => d.avg_gas_fee_usd)! * 1.1;
+    const minGasFee = Math.max(d3.min(data, d => d.avg_gas_fee_usd)!, 0.00001);
+    const y = d3.scaleLog().domain([minGasFee, maxGasFee]).range([innerHeight, 0]).base(10).clamp(true);
+    const logMin = Math.log10(minGasFee);
+    const logMax = Math.log10(maxGasFee);
+    const tickCount = 8;
+    const tickStep = (logMax - logMin) / (tickCount - 1);
+    const tickValues = Array.from({ length: tickCount }, (_, i) => Math.pow(10, logMin + i * tickStep))
+      .filter(val => val >= minGasFee && val <= maxGasFee);
+    const color = d3.scaleOrdinal().domain(["Transfer", "Swap"]).range([colors.transfer, colors.swap]);
+    const line = d3.line<{ date: string; value: number }>()
+      .x(d => x(d.date)! + x.bandwidth() / 2)
+      .y(d => y(d.value > 0 ? d.value : minGasFee))
+      .curve(d3.curveCatmullRom.alpha(0.1));
+  
+    g.selectAll(".grid").remove();
+    const makeYGridLines = () => d3.axisLeft(y).tickValues(tickValues).tickSize(-innerWidth);
+    g.append("g")
+      .attr("class", "grid")
+      .call(makeYGridLines().tickFormat(() => ""))
+      .selectAll("line")
+      .attr("stroke", "rgba(255, 255, 255, 0.1)");
+  
+    ["Transfer", "Swap"].forEach(eventType => {
+      const lineData = dates.map(date => {
+        const entry = nestedData.get(date)?.find(d => d.event_type === eventType);
+        return { date, value: entry ? entry.avg_gas_fee_usd : 0 };
+      });
+  
+      let path = g.select(`.line-${eventType.toLowerCase()}`);
+      if (path.empty()) {
+        path = g.append("path")
+          .attr("class", `line-${eventType.toLowerCase()}`)
+          .attr("fill", "none")
+          .attr("stroke", `url(#${eventType.toLowerCase()}Gradient)`)
+          .attr("stroke-width", 2)
+          .attr("filter", "url(#glow)")
+          .attr("d", line(lineData));
+      }
+  
+      const latestEntry = data.filter(d => d.event_type === eventType && d.avg_gas_fee_usd > 0).slice(-1)[0];
+      let circle = g.select(`.latest-point-${eventType.toLowerCase()}`);
+      if (circle.empty() && latestEntry) {
+        circle = g.append("circle")
+          .attr("class", `latest-point-${eventType.toLowerCase()}`)
+          .attr("cx", x(latestEntry.event_date)! + x.bandwidth() / 2)
+          .attr("cy", y(latestEntry.avg_gas_fee_usd))
+          .attr("r", 3)
+          .attr("fill", "#fff")
+          .attr("opacity", 0);
+      }
+  
+      const pathNode = path.node() as SVGPathElement | null;
+      if (isFirstMount.current && pathNode) {
+        const totalLength = pathNode.getTotalLength();
+        if (totalLength > 0) {
+          path.attr("stroke-dasharray", totalLength).attr("stroke-dashoffset", totalLength);
+          gsap.to(pathNode, {
+            strokeDashoffset: 0,
+            duration: 4,
+            ease: "power2.out",
+            delay: eventType === "Transfer" ? 0 : 0.5,
+            onComplete: () => {
+              if (latestEntry) {
+                gsap.to(circle.node(), { opacity: 1, duration: 0.5, onComplete: () => {
+                  gsap.to(circle.node(), { r: 6, repeat: -1, yoyo: true, duration: 0.8, ease: "power1.inOut" });
+                }});
+              }
+            },
+          });
+        } else {
+          path.attr("stroke-dasharray", null).attr("stroke-dashoffset", null);
+          if (latestEntry) circle.attr("opacity", 1);
+        }
+      } else {
+        path.datum(lineData).attr("d", line);
+        if (latestEntry) {
+          circle.attr("cx", x(latestEntry.event_date)! + x.bandwidth() / 2)
+                .attr("cy", y(latestEntry.avg_gas_fee_usd))
+                .attr("opacity", 1);
+          const circleNode = circle.node();
+          if (circleNode && !gsap.isTweening(circleNode)) {
+            gsap.to(circleNode, { r: 6, repeat: -1, yoyo: true, duration: 0.8, ease: "power1.inOut" });
+          }
+        }
+      }
+    });
+  
+    g.selectAll(".dot").remove();
+    g.selectAll(".dot")
+      .data(data.filter(d => d.avg_gas_fee_usd > 0))
+      .enter()
+      .append("circle")
+      .attr("class", "dot")
+      .attr("cx", d => x(d.event_date)! + x.bandwidth() / 2)
+      .attr("cy", d => y(d.avg_gas_fee_usd))
+      .attr("r", 4)
+      .attr("fill", d => color(d.event_type) as string)
+      .attr("opacity", 0.4)
+      .on("mouseover", (event, d) => {
+        d3.select(event.currentTarget).attr("opacity", 1);
+        if (tooltipRef.current) {
+          tooltipRef.current.style.opacity = "1";
+          tooltipRef.current.innerHTML = `Date: ${d.event_date}<br>Type: ${d.event_type}<br>Gas Fee: $${d.avg_gas_fee_usd.toFixed(2)} USD<br>Count: ${d.transaction_count}`;
+          tooltipRef.current.style.left = `${event.pageX + 10}px`;
+          tooltipRef.current.style.top = `${event.pageY - 10}px`;
+        }
+      })
+      .on("mousemove", event => {
+        if (tooltipRef.current) {
+          tooltipRef.current.style.left = `${event.pageX + 10}px`;
+          tooltipRef.current.style.top = `${event.pageY - 10}px`;
+        }
+      })
+      .on("mouseout", (event) => {
+        d3.select(event.currentTarget).attr("opacity", 0.4);
+        if (tooltipRef.current) tooltipRef.current.style.opacity = "0";
+      })
+      .transition()
+      .duration(500);
+  
+    g.selectAll(".legend").remove();
+    const legend = g.append("g")
+      .attr("class", "legend")
+      .attr("transform", `translate(${innerWidth - 50}, -30)`);
+    ["Transfer", "Swap"].forEach((eventType, i) => {
+      legend.append("line")
+        .attr("x1", 0).attr("y1", i * 20)
+        .attr("x2", 20).attr("y2", i * 20)
+        .attr("stroke", color(eventType) as string)
+        .attr("stroke-width", 2);
+      legend.append("text")
+        .attr("x", 25).attr("y", i * 20 + 5)
+        .attr("font-size", 12)
+        .attr("fill", "#fff").text(eventType);
+    });
+  
+    if (isFirstMount.current) {
+      g.append("g").attr("class", "x-axis");
+      g.append("g").attr("class", "y-axis");
+    }
+    g.select(".x-axis")
+      .attr("transform", `translate(0,${innerHeight})`)
+      .call(d3.axisBottom(x).tickFormat(d => d.slice(5)))
+      .selectAll("text")
+      .attr("fill", "#fff")
+      .style("text-anchor", "end")
+      .attr("dx", "-.8em")
+      .attr("dy", ".15em")
+      .attr("transform", "rotate(-45)");
+    g.select(".y-axis")
+      .call(d3.axisLeft(y).tickValues(tickValues).tickFormat(d => `$${d.toFixed(2)}`))
+      .selectAll("text")
+      .attr("fill", "#fff");
+    g.select(".y-axis-label").remove();
+    g.append("text")
+      .attr("class", "y-axis-label")
+      .attr("transform", "rotate(-90)")
+      .attr("y", -margin.left + 20)
+      .attr("x", -innerHeight / 2)
+      .attr("text-anchor", "middle")
+      .attr("fill", "#fff")
+      .attr("font-size", 14)
+      .text("Gas Fee (USD)");
+  
+    svg.attr("font-family", "Josefin Sans, sans-serif");
+    isFirstMount.current = false;
+  };
+
+  useEffect(() => {
+    const updateChartSize = () => {
+      if (containerRef.current && svgRef.current) {
+        const width = containerRef.current.clientWidth || 600;
+        const height = containerRef.current.clientHeight || 360;
+        if (gasFeeData.length) renderChart(gasFeeData, width, height);
+      }
+    };
+
+    updateChartSize();
+    const resizeObserver = new ResizeObserver(() => updateChartSize());
+    if (containerRef.current) resizeObserver.observe(containerRef.current);
+
+    return () => {
+      if (containerRef.current) resizeObserver.unobserve(containerRef.current);
+    };
+  }, [gasFeeData]);
+
+  useEffect(() => {
+    return () => {
+      isFirstMount.current = true;
+    };
+  }, []);
+
+  return (
+    <div ref={containerRef} style={{ width: "100%", height: "100%" }}>
+      <svg ref={svgRef} style={{ width: "100%", height: "100%" }}></svg>
+    </div>
+  );
+};
+
+export default GasFeesChart;
+
+
 // "use client";
 // import React, { useEffect, useRef } from "react";
 // import * as d3 from "d3";
@@ -346,327 +669,3 @@
 // };
 
 // export default GasFeesChart;
-
-
-
-"use client";
-import React, { useEffect, useRef } from "react";
-import * as d3 from "d3";
-import { gsap } from "gsap";
-import styles from "../../styles/Explore.module.css";
-
-interface GasFeeOverTimeData {
-  event_date: string;
-  event_type: string;
-  avg_gas_fee_eth: number;
-  avg_gas_fee_usd: number;
-  transaction_count: number;
-}
-
-interface GasFeesChartProps {
-  gasFeeData: GasFeeOverTimeData[];
-  onZoom?: () => void;
-  onPan?: () => void;
-  onDownload?: () => void;
-}
-
-const GasFeesChart: React.FC<GasFeesChartProps> = ({ gasFeeData, onZoom, onPan, onDownload }) => {
-  const svgRef = useRef<SVGSVGElement | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const tooltipRef = useRef<HTMLDivElement | null>(null);
-  const isFirstMount = useRef(true);
-
-  const colors = {
-    transfer: "#ffd700",
-    swap: "#1E90FF",
-    background: "#010214",
-    text: "rgba(255, 255, 255, 0.1)",
-  };
-
-  // Tooltip setup
-  useEffect(() => {
-    const tooltip = document.createElement("div");
-    tooltip.className = "tooltip";
-    tooltip.style.position = "absolute";
-    tooltip.style.background = "rgba(0, 0, 0, 0.8)";
-    tooltip.style.color = "#fff";
-    tooltip.style.padding = "5px 10px";
-    tooltip.style.borderRadius = "4px";
-    tooltip.style.pointerEvents = "none";
-    tooltip.style.fontSize = "14px";
-    tooltip.style.fontFamily = "Josefin Sans, sans-serif";
-    tooltip.style.fontWeight = '200';
-    tooltip.style.opacity = "0";
-    tooltip.style.zIndex = "1000";
-    document.body.appendChild(tooltip);
-    tooltipRef.current = tooltip;
-
-    return () => {
-      if (tooltipRef.current) {
-        document.body.removeChild(tooltipRef.current);
-        tooltipRef.current = null;
-      }
-    };
-  }, []);
-
-  const renderChart = (data: GasFeeOverTimeData[], width: number, height: number) => {
-    if (!svgRef.current || !containerRef.current || !data.length) return;
-  
-    const svg = d3.select(svgRef.current);
-    const margin = { top: 40, right: 50, bottom: 60, left: 60 };
-    const innerWidth = width - margin.left - margin.right;
-    const innerHeight = height - margin.top - margin.bottom;
-  
-    if (isFirstMount.current) svg.selectAll("*").remove();
-  
-    const g = svg.select("g").empty()
-      ? svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`)
-      : svg.select("g");
-  
-    // Define gradients and effects
-    const defs = svg.select("defs").empty() ? svg.append("defs") : svg.select("defs");
-  
-// Transfer gradient
-const transferGradient = defs.append("linearGradient")
-.attr("id", "transferGradient")
-.attr("x1", "0%").attr("y1", "0%").attr("x2", "100%").attr("y2", "0%");
-transferGradient.append("stop").attr("offset", "0%").attr("stop-color", "#ff831e");
-transferGradient.append("stop").attr("offset", "35%").attr("stop-color", "#ffd700");
-
-// Swap gradient
-const swapGradient = defs.append("linearGradient")
-.attr("id", "swapGradient")
-.attr("x1", "0%").attr("y1", "0%").attr("x2", "100%").attr("y2", "0%");
-swapGradient.append("stop").attr("offset", "0%").attr("stop-color", "#1E90FF");
-swapGradient.append("stop").attr("offset", "90%").attr("stop-color", "#5a9bd3");
-
-// Background gradient
-const bgGradient = defs.append("linearGradient")
-.attr("id", "bgGradient")
-.attr("x1", "0%").attr("y1", "0%").attr("x2", "0%").attr("y2", "100%");
-bgGradient.append("stop").attr("offset", "0%").attr("stop-color", "#010214");
-bgGradient.append("stop").attr("offset", "100%").attr("stop-color", "#020428");
-
-// Glow filter
-const glowFilter = defs.append("filter").attr("id", "glow");
-glowFilter.append("feGaussianBlur").attr("stdDeviation", 2).attr("result", "coloredBlur");
-const feMerge = glowFilter.append("feMerge");
-feMerge.append("feMergeNode").attr("in", "coloredBlur");
-feMerge.append("feMergeNode").attr("in", "SourceGraphic");
-  
-    svg.insert("rect", ":first-child")
-      .attr("width", width).attr("height", height)
-      .attr("fill", "url(#bgGradient)");
-  
-    // svg.selectAll("text.title").remove();
-    // svg.append("text")
-    //   .attr("class", "title")
-    //   .attr("x", width / 2).attr("y", margin.top / 2)
-    //   .attr("text-anchor", "middle").attr("fill", "#fff")
-    //   .attr("font-size", "14px")
-    //   .text("Average Gas Fees Over Time");
-  
-    const dates = Array.from(new Set(data.map(d => d.event_date))).sort();
-    const nestedData = d3.group(data, d => d.event_date);
-    const x = d3.scaleBand().domain(dates).range([0, innerWidth]).padding(0.1);
-    const maxGasFee = d3.max(data, d => d.avg_gas_fee_usd)! * 1.1;
-    const minGasFee = Math.max(d3.min(data, d => d.avg_gas_fee_usd)!, 0.00001);
-    const y = d3.scaleLog().domain([minGasFee, maxGasFee]).range([innerHeight, 0]).base(10).clamp(true);
-    const logMin = Math.log10(minGasFee);
-    const logMax = Math.log10(maxGasFee);
-    const tickCount = 8;
-    const tickStep = (logMax - logMin) / (tickCount - 1);
-    const tickValues = Array.from({ length: tickCount }, (_, i) => Math.pow(10, logMin + i * tickStep))
-      .filter(val => val >= minGasFee && val <= maxGasFee);
-    const color = d3.scaleOrdinal().domain(["Transfer", "Swap"]).range([colors.transfer, colors.swap]);
-    const line = d3.line<{ date: string; value: number }>()
-      .x(d => x(d.date)! + x.bandwidth() / 2)
-      .y(d => y(d.value > 0 ? d.value : minGasFee))
-      .curve(d3.curveCatmullRom.alpha(0.1));
-  
-    g.selectAll(".grid").remove();
-    const makeYGridLines = () => d3.axisLeft(y).tickValues(tickValues).tickSize(-innerWidth);
-    g.append("g")
-      .attr("class", "grid")
-      .call(makeYGridLines().tickFormat(() => ""))
-      .selectAll("line")
-      .attr("stroke", "rgba(255, 255, 255, 0.1)");
-  
-    ["Transfer", "Swap"].forEach(eventType => {
-      const lineData = dates.map(date => {
-        const entry = nestedData.get(date)?.find(d => d.event_type === eventType);
-        return { date, value: entry ? entry.avg_gas_fee_usd : 0 };
-      });
-  
-      let path = g.select(`.line-${eventType.toLowerCase()}`);
-      if (path.empty()) {
-        path = g.append("path")
-          .attr("class", `line-${eventType.toLowerCase()}`)
-          .attr("fill", "none")
-          .attr("stroke", `url(#${eventType.toLowerCase()}Gradient)`)
-          .attr("stroke-width", 2)
-          .attr("filter", "url(#glow)")
-          .attr("d", line(lineData));
-      }
-  
-      const latestEntry = data.filter(d => d.event_type === eventType && d.avg_gas_fee_usd > 0).slice(-1)[0];
-      let circle = g.select(`.latest-point-${eventType.toLowerCase()}`);
-      if (circle.empty() && latestEntry) {
-        circle = g.append("circle")
-          .attr("class", `latest-point-${eventType.toLowerCase()}`)
-          .attr("cx", x(latestEntry.event_date)! + x.bandwidth() / 2)
-          .attr("cy", y(latestEntry.avg_gas_fee_usd))
-          .attr("r", 3)
-          .attr("fill", "#fff")
-          .attr("opacity", 0);
-      }
-  
-      const pathNode = path.node() as SVGPathElement | null;
-      if (isFirstMount.current && pathNode) {
-        const totalLength = pathNode.getTotalLength();
-        if (totalLength > 0) {
-          path.attr("stroke-dasharray", totalLength).attr("stroke-dashoffset", totalLength);
-          gsap.to(pathNode, {
-            strokeDashoffset: 0,
-            duration: 4,
-            ease: "power2.out",
-            delay: eventType === "Transfer" ? 0 : 0.5,
-            onComplete: () => {
-              if (latestEntry) {
-                gsap.to(circle.node(), { opacity: 1, duration: 0.5, onComplete: () => {
-                  gsap.to(circle.node(), { r: 6, repeat: -1, yoyo: true, duration: 0.8, ease: "power1.inOut" });
-                }});
-              }
-            },
-          });
-        } else {
-          path.attr("stroke-dasharray", null).attr("stroke-dashoffset", null);
-          if (latestEntry) circle.attr("opacity", 1);
-        }
-      } else {
-        path.datum(lineData).attr("d", line);
-        if (latestEntry) {
-          circle.attr("cx", x(latestEntry.event_date)! + x.bandwidth() / 2)
-                .attr("cy", y(latestEntry.avg_gas_fee_usd))
-                .attr("opacity", 1);
-          const circleNode = circle.node();
-          if (circleNode && !gsap.isTweening(circleNode)) {
-            gsap.to(circleNode, { r: 6, repeat: -1, yoyo: true, duration: 0.8, ease: "power1.inOut" });
-          }
-        }
-      }
-    });
-  
-    g.selectAll(".dot").remove();
-    g.selectAll(".dot")
-      .data(data.filter(d => d.avg_gas_fee_usd > 0))
-      .enter()
-      .append("circle")
-      .attr("class", "dot")
-      .attr("cx", d => x(d.event_date)! + x.bandwidth() / 2)
-      .attr("cy", d => y(d.avg_gas_fee_usd))
-      .attr("r", 4)
-      .attr("fill", d => color(d.event_type) as string)
-      .attr("opacity", 0.4)
-      .on("mouseover", (event, d) => {
-        d3.select(event.currentTarget).attr("opacity", 1);
-        if (tooltipRef.current) {
-          tooltipRef.current.style.opacity = "1";
-          tooltipRef.current.innerHTML = `Date: ${d.event_date}<br>Type: ${d.event_type}<br>Gas Fee: $${d.avg_gas_fee_usd.toFixed(2)} USD<br>Count: ${d.transaction_count}`;
-          tooltipRef.current.style.left = `${event.pageX + 10}px`;
-          tooltipRef.current.style.top = `${event.pageY - 10}px`;
-        }
-      })
-      .on("mousemove", event => {
-        if (tooltipRef.current) {
-          tooltipRef.current.style.left = `${event.pageX + 10}px`;
-          tooltipRef.current.style.top = `${event.pageY - 10}px`;
-        }
-      })
-      .on("mouseout", (event) => {
-        d3.select(event.currentTarget).attr("opacity", 0.4);
-        if (tooltipRef.current) tooltipRef.current.style.opacity = "0";
-      })
-      .transition()
-      .duration(500);
-  
-    g.selectAll(".legend").remove();
-    const legend = g.append("g")
-      .attr("class", "legend")
-      .attr("transform", `translate(${innerWidth - 50}, -30)`);
-    ["Transfer", "Swap"].forEach((eventType, i) => {
-      legend.append("line")
-        .attr("x1", 0).attr("y1", i * 20)
-        .attr("x2", 20).attr("y2", i * 20)
-        .attr("stroke", color(eventType) as string)
-        .attr("stroke-width", 2);
-      legend.append("text")
-        .attr("x", 25).attr("y", i * 20 + 5)
-        .attr("font-size", 12)
-        .attr("fill", "#fff").text(eventType);
-    });
-  
-    if (isFirstMount.current) {
-      g.append("g").attr("class", "x-axis");
-      g.append("g").attr("class", "y-axis");
-    }
-    g.select(".x-axis")
-      .attr("transform", `translate(0,${innerHeight})`)
-      .call(d3.axisBottom(x).tickFormat(d => d.slice(5)))
-      .selectAll("text")
-      .attr("fill", "#fff")
-      .style("text-anchor", "end")
-      .attr("dx", "-.8em")
-      .attr("dy", ".15em")
-      .attr("transform", "rotate(-45)");
-    g.select(".y-axis")
-      .call(d3.axisLeft(y).tickValues(tickValues).tickFormat(d => `$${d.toFixed(2)}`))
-      .selectAll("text")
-      .attr("fill", "#fff");
-    g.select(".y-axis-label").remove();
-    g.append("text")
-      .attr("class", "y-axis-label")
-      .attr("transform", "rotate(-90)")
-      .attr("y", -margin.left + 20)
-      .attr("x", -innerHeight / 2)
-      .attr("text-anchor", "middle")
-      .attr("fill", "#fff")
-      .attr("font-size", 14)
-      .text("Gas Fee (USD)");
-  
-    svg.attr("font-family", "Josefin Sans, sans-serif");
-    isFirstMount.current = false;
-  };
-
-  useEffect(() => {
-    const updateChartSize = () => {
-      if (containerRef.current && svgRef.current) {
-        const width = containerRef.current.clientWidth || 600;
-        const height = containerRef.current.clientHeight || 360;
-        if (gasFeeData.length) renderChart(gasFeeData, width, height);
-      }
-    };
-
-    updateChartSize();
-    const resizeObserver = new ResizeObserver(() => updateChartSize());
-    if (containerRef.current) resizeObserver.observe(containerRef.current);
-
-    return () => {
-      if (containerRef.current) resizeObserver.unobserve(containerRef.current);
-    };
-  }, [gasFeeData]);
-
-  useEffect(() => {
-    return () => {
-      isFirstMount.current = true;
-    };
-  }, []);
-
-  return (
-    <div ref={containerRef} style={{ width: "100%", height: "100%" }}>
-      <svg ref={svgRef} style={{ width: "100%", height: "100%" }}></svg>
-    </div>
-  );
-};
-
-export default GasFeesChart;

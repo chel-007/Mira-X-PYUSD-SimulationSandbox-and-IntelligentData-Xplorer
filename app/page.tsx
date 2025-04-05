@@ -11,7 +11,6 @@ export default function Home() {
 
   const handleTradeClick = () => router.push("/explore");
   const handleSandboxClick = () => router.push("/sandbox");
-  console.log('GOOGLE_APPLICATION_CREDENTIALS:', process.env.GOOGLE_APPLICATION_CREDENTIALS);
 
   return (
     <div className={styles.container}>

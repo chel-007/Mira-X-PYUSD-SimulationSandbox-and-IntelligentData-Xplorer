@@ -8,28 +8,27 @@
 }
 
 .appContainer {
-  /* Remove absolute positioning */
-  padding: clamp(10px, 2vw, 20px) 0; /* Scales padding from 10px to 20px */
-  width: auto; /* Let it size naturally within topBar */
+  padding: clamp(10px, 2vw, 20px) 0; 
+  width: auto;
   display: flex;
   justify-content: center;
   align-items: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  flex-shrink: 1; /* Allow shrinking to fit */
-  gap: clamp(5px, 1vw, 10px); /* Responsive gap between appName and betaBadge */
+  flex-shrink: 1; 
+  gap: clamp(5px, 1vw, 10px);
 }
 
 .betaBadge {
   background-color: rgba(255, 255, 255, 0.1);
   color: white;
   border-radius: 18px;
-  padding: clamp(3px, 0.5vw, 5px) clamp(6px, 1vw, 10px); /* Scales padding */
-  font-size: clamp(7px, 1vw, 9px); /* Scales from 7px to 9px */
+  padding: clamp(3px, 0.5vw, 5px) clamp(6px, 1vw, 10px);
+  font-size: clamp(7px, 1vw, 9px);
 }
 
 .appName {
-  margin-right: clamp(4px, 1vw, 7px); /* Scales margin */
-  font-size: clamp(18px, 3vw, 26px); /* Scales from 18px to 26px */
+  margin-right: clamp(4px, 1vw, 7px);
+  font-size: clamp(18px, 3vw, 26px);
   color: white;
   font-family: "Red Rose", serif;
 }
@@ -38,27 +37,25 @@
   color: #7BCFFF;
 }
 
-/* Small screens adjustments */
 @media (max-width: 600px) {
   .appContainer {
-    padding: 8px 0; /* Fixed smaller padding */
-    gap: 5px; /* Tighter gap */
+    padding: 8px 0; 
+    gap: 5px;
   }
 
   .betaBadge {
-    padding: 3px 6px; /* Smaller padding */
-    font-size: 7px; /* Minimum size */
+    padding: 3px 6px;
+    font-size: 7px;
   }
 
   .appName {
-    margin-right: 4px; /* Minimum margin */
-    font-size: 16px; /* Minimum readable size */
+    margin-right: 4px;
+    font-size: 16px;
   }
 }
 
-/* Wrapper for tagline and box to center them in the remaining space */
 .contentWrapper {
-  flex: 1; /* Grow to fill remaining space */
+  flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -182,21 +179,20 @@
   border: 1px solid rgba(255, 255, 255, 0.6);
 }
 
-/* Media query for mobile devices (below 768px) */
 @media (max-width: 768px) {
   .box {
-    flex-direction: column; /* Stack features vertically */
-    align-items: center; /* Center features horizontally */
-    width: 90%; /* Use more of the screen width */
-    max-width: none; /* Remove max-width constraint */
-    padding: 20px; /* Reduce padding for smaller screens */
+    flex-direction: column;
+    align-items: center;
+    width: 90%;
+    max-width: none;
+    padding: 20px;
   }
 
   .feature {
-    width: 100%; /* Take full width of the container */
-    max-width: 300px; /* Limit the maximum width for readability */
-    padding: 16px; /* Reduce padding */
-    margin-bottom: 20px; /* Add space between stacked features */
+    width: 100%;
+    max-width: 300px;
+    padding: 16px;
+    margin-bottom: 20px;
   }
 
   /* Remove the vertical separator on mobile */
@@ -204,57 +200,54 @@
     display: none; /* Hide the separator */
   }
 
-  /* Adjust font sizes and spacing for mobile */
   .largeText {
-    font-size: 20px; /* Smaller font size */
+    font-size: 20px;
   }
 
   .subtext {
-    font-size: 12px; /* Smaller font size */
-    margin-bottom: 20px; /* Reduce margin */
+    font-size: 12px;
+    margin-bottom: 20px;
   }
 
   .featureButton {
-    font-size: 12px; /* Smaller font size */
-    padding: 8px; /* Reduce padding */
-    margin-top: 15px; /* Reduce margin */
+    font-size: 12px;
+    padding: 8px; 
+    margin-top: 15px;
   }
 
   .featureButton i {
-    font-size: 10px; /* Smaller icon size */
+    font-size: 10px;
   }
 }
 
-/* Optional: Additional adjustments for very small screens (below 480px) */
 @media (max-width: 480px) {
   .box {
-    width: 95%; /* Use almost the full width */
-    padding: 15px; /* Further reduce padding */
+    width: 95%;
+    padding: 15px;
   }
 
   .feature {
-    padding: 12px; /* Further reduce padding */
-    margin-bottom: 15px; /* Reduce space between features */
+    padding: 12px;
+    margin-bottom: 15px;
   }
 
   .largeText {
-    font-size: 18px; /* Even smaller font size */
+    font-size: 18px;
   }
 
   .subtext {
-    font-size: 11px; /* Even smaller font size */
-    margin-bottom: 15px; /* Further reduce margin */
+    font-size: 11px;
+    margin-bottom: 15px;
   }
 
   .featureButton {
-    font-size: 11px; /* Even smaller font size */
-    padding: 6px; /* Further reduce padding */
-    margin-top: 10px; /* Further reduce margin */
+    font-size: 11px;
+    padding: 6px;
+    margin-top: 10px; 
   }
 }
 
 .footer {
-  /* Remove fixed positioning */
   font-family: "Josefin Sans", serif;
   color: rgba(255, 255, 255, 0.6);
   width: 100%;
@@ -264,5 +257,5 @@
   gap: 8px;
   align-items: center;
   font-size: 13px;
-  flex-shrink: 0; /* Prevent shrinking */
+  flex-shrink: 0; 
 }
