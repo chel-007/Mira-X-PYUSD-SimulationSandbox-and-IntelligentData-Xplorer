@@ -1,0 +1,9 @@
+# Ignore node_modules and lock files
+node_modules/
+package-lock.json
+
+# Ignore other common files
+.git
+.gitignore
+.env
+*.log
