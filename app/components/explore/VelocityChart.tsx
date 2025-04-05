@@ -14,7 +14,7 @@ const VelocityChart: React.FC<VelocityChartProps> = ({ txPerHour, maxTxPerHour, 
   const velocityRef = useRef<SVGSVGElement | null>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const isFirstMount = useRef(true);
-  const currentEndAngle = useRef(0); // Start at 0 radians (left after rotation)
+  const currentEndAngle = useRef(0); // Start at 0 radians
   const currentNeedleAngle = useRef(-Math.PI / 2);
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -26,7 +26,6 @@ const VelocityChart: React.FC<VelocityChartProps> = ({ txPerHour, maxTxPerHour, 
     const height = chartContainerRef.current?.clientHeight || 200;
     const radius = Math.min(width, height) / 2;
     const yOffset = height * 0.1;
-
     const fontSize = radius * 0.15;
 
     const angleScale = d3.scaleLinear().domain([0, 1]).range([-Math.PI / 2, Math.PI / 2]);
@@ -39,20 +38,14 @@ const VelocityChart: React.FC<VelocityChartProps> = ({ txPerHour, maxTxPerHour, 
     const backgroundArc = d3.arc()
       .innerRadius(radius * 0.6)
       .outerRadius(radius * 0.9)
-      .startAngle(needleScale(0)) // 0 radians (left after rotation)
-      .endAngle(needleScale(1)); // π radians (right after rotation)
+      .startAngle(needleScale(0))
+      .endAngle(needleScale(1));
 
     const velocityArc = d3.arc()
       .innerRadius(radius * 0.6)
       .outerRadius(radius * 0.9)
       .startAngle(needleScale(0))
       .endAngle(newEndAngle);
-
-    const initialVelocityArc = d3.arc()
-      .innerRadius(radius * 0.6)
-      .outerRadius(radius * 0.9)
-      .startAngle(needleScale(0))
-      .endAngle(needleScale(0)); // Zero-width at start
 
     if (isFirstMount.current) {
       svg.selectAll("*").remove();
@@ -67,7 +60,7 @@ const VelocityChart: React.FC<VelocityChartProps> = ({ txPerHour, maxTxPerHour, 
 
       const velocityPath = g.append("path")
         .attr("class", "velocity-path")
-        .attr("d", initialVelocityArc()) // Start at exact 0 point
+        .attr("d", velocityArc.endAngle(needleScale(0))()) // Start at 0
         .attr("fill", "#7BCFFF")
         .attr("opacity", 0.8);
 
@@ -90,26 +83,20 @@ const VelocityChart: React.FC<VelocityChartProps> = ({ txPerHour, maxTxPerHour, 
         .attr("font-size", fontSize)
         .text(`${Math.round(txPerHour)} tx/h`);
 
-      gsap.fromTo(velocityPath.node(), 
-        { arcEndAngle: needleScale(0) }, // Explicitly start at 0
-        {
-          arcEndAngle: newEndAngle,
-          duration: 1,
-          ease: "power2.out",
-          onUpdate: function () {
-            const endAngle = this.targets()[0].arcEndAngle;
-            velocityPath.attr("d", d3.arc()
-              .innerRadius(radius * 0.6)
-              .outerRadius(radius * 0.9)
-              .startAngle(needleScale(0))
-              .endAngle(endAngle)());
-          },
-          onComplete: () => {
-            currentEndAngle.current = newEndAngle;
-          },
-        }
-      );
+      // D3 transition for arc
+      velocityPath
+        .transition()
+        .duration(1000)
+        .ease(d3.easeQuadOut)
+        .attrTween("d", () => {
+          const interpolate = d3.interpolate(needleScale(0), newEndAngle);
+          return t => velocityArc.endAngle(interpolate(t))();
+        })
+        .on("end", () => {
+          currentEndAngle.current = newEndAngle;
+        });
 
+      // GSAP for needle (still free-friendly)
       gsap.to({ angle: angleScale(0) }, {
         angle: newNeedleAngle,
         duration: 1.5,
@@ -133,21 +120,17 @@ const VelocityChart: React.FC<VelocityChartProps> = ({ txPerHour, maxTxPerHour, 
         .attr("d", backgroundArc());
 
       const velocityPath = g.select(".velocity-path");
-      gsap.to({ endAngle: currentEndAngle.current }, {
-        endAngle: newEndAngle,
-        duration: 0.5,
-        ease: "power2.out",
-        onUpdate: function () {
-          velocityPath.attr("d", d3.arc()
-            .innerRadius(radius * 0.6)
-            .outerRadius(radius * 0.9)
-            .startAngle(needleScale(0))
-            .endAngle(this.targets()[0].endAngle)());
-        },
-        onComplete: () => {
+      velocityPath
+        .transition()
+        .duration(500)
+        .ease(d3.easeQuadOut)
+        .attrTween("d", () => {
+          const interpolate = d3.interpolate(currentEndAngle.current, newEndAngle);
+          return t => velocityArc.endAngle(interpolate(t))();
+        })
+        .on("end", () => {
           currentEndAngle.current = newEndAngle;
-        },
-      });
+        });
 
       const needle = g.select("#needle");
       gsap.to(needle.node(), {

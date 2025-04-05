@@ -267,5 +267,37 @@
     color: #888;
     cursor: not-allowed;
   }
-  /* .textInputNode input {
-  } */
+
+  .selectorNode {
+    padding: 5px;
+    background-color: #010214;
+    border-radius: 8px;
+  }
+  
+  .selectorNode select {
+    width: 100%;
+    padding: 5px;
+    background-color: #010214; /* Dark background */
+    color: #ffffff; /* White text */
+    border: 1px solid #7BCFFF; /* Cyan border */
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  
+  .selectorNode select option {
+    background-color: #010214; /* Dark background for options */
+    color: #ffffff; /* White text for options */
+  }
+  
+  /* Hover effect for the select */
+  .selectorNode select:hover {
+    background-color: #020428; /* Slightly lighter dark */
+  }
+  
+  /* Focus effect */
+  .selectorNode select:focus {
+    outline: none;
+    border-color: #7BCFFF;
+    box-shadow: 0 0 5px #7bcfffa3;
+  }

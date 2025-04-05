@@ -6,6 +6,7 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 interface SimulationContextType {
   simulationResult: { gasEstimate?: string; simulationResult?: string; error?: string } | null;
   setSimulationResult: (result: { gasEstimate?: string; simulationResult?: string; error?: string } | null) => void;
+  
   clearSimulation: () => void; // New function
 }
 
@@ -15,11 +16,15 @@ const SimulationContext = createContext<SimulationContextType | undefined>(undef
 
 export const SimulationProvider = ({ children }: { children: ReactNode }) => {
   const [simulationResult, setSimulationResult] = useState<SimulationContextType['simulationResult']>(null);
+  const [amountOut, setAmountOut] = useState(null);
 
-  const clearSimulation = () => setSimulationResult(null);
+  const clearSimulation = () => {
+    setSimulationResult(null);
+    setAmountOut(null);
+  }
 
   return (
-    <SimulationContext.Provider value={{ simulationResult, setSimulationResult, clearSimulation }}>
+    <SimulationContext.Provider value={{ simulationResult, setSimulationResult, clearSimulation, amountOut, setAmountOut }}>
       {children}
     </SimulationContext.Provider>
   );

@@ -215,12 +215,30 @@
     color: #7BCFFF;
 }
 
-.tooltip {
+/* .tooltip {
     position: absolute;
     background: #333;
     color: #fff;
     padding: 5px;
     border-radius: 3px;
+    pointer-events: none;
+  } */
+
+  .tooltip {
+    font-size: 12px;
+    fill: #ffffff;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 4px 8px;
+    border-radius: 4px;
+    pointer-events: none; /* Prevents tooltips from interfering with mouse events */
+    opacity: 0; /* Hidden by default */
+    transition: opacity 0.2s ease; /* Fallback for non-GSAP animation */
+  }
+  
+  .tooltipValue {
+    font-size: 10px;
+    fill: #7BCFFF; /* Match your chart’s primary color */
+    text-anchor: middle;
     pointer-events: none;
   }
 

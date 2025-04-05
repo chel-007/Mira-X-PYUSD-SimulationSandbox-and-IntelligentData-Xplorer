@@ -5,6 +5,9 @@ import { useAccount, useDisconnect } from 'wagmi';
 import { walletModal } from '../../lib/walletConfig';
 import ChartReports from './ChartReports';
 import StakingChart from './StakingChart';
+import { Pool, Position } from '@uniswap/v3-sdk';
+import { Token } from '@uniswap/sdk-core';
+import { useEthPrice } from "../../utils/EthPriceProvider";
 
 const RPC_URL =
   'https://blockchain.googleapis.com/v1/projects/pyusd-sandbox/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=AIzaSyCJKmstvRGEAlZEAHmjmAZViMl9IqQFbDE';
@@ -30,6 +33,8 @@ const Wallets = () => {
   const [isMocking, setIsMocking] = useState(false);
   const [tempMockAddress, setTempMockAddress] = useState<string>(''); // For confirmation step
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const { ethPrice, loading: ethPriceLoading } = useEthPrice();
+  
 
   const effectiveAddress = mockAddress || address;
 
@@ -78,30 +83,72 @@ const Wallets = () => {
 
   // Fetch Transaction and Gas Data
   const fetchTransactionData = async () => {
-    if (!effectiveAddress || isLoading) return; // Use effectiveAddress
+  
+    if (!effectiveAddress || isLoading) return;
+  
+    // Capture the address at the start of the fetch
+    const requestedAddress = effectiveAddress;
     setIsLoading(true);
+  
     try {
-      const response = await fetch(`/api/bigQueryTxSandbox?address=${effectiveAddress}`);
+      const response = await fetch(`/api/bigQueryTxSandbox?address=${requestedAddress}`);
       const { transactionData, gasData } = await response.json();
+  
+      // Check if effectiveAddress changed during the fetch
+      if (requestedAddress !== effectiveAddress) {
+        console.log(
+          `Address changed during fetch. Requested: ${requestedAddress}, Current: ${effectiveAddress}. Discarding data.`
+        );
+        return; // Abort setting state if address changed
+      }
+  
+      // Wait for ethPrice to load
+      if (ethPriceLoading) {
+        await new Promise(resolve => {
+          const checkEthPrice = () => {
+            if (!ethPriceLoading) resolve();
+            else setTimeout(checkEthPrice, 100);
+          };
+          checkEthPrice();
+        });
+      }
+  
+      // Process gasData into USD
+      const gasDataUsd = gasData.map(day => ({
+        date: day.date,
+        gas: ethPrice ? (parseFloat(day.gas) * ethPrice).toFixed(2) : '0.00', // Fallback if ethPrice is unavailable
+      }));
+
+      console.log("gasDataUsd", gasDataUsd)
+      console.log("ethPrice", ethPrice)
+  
+      // Update state only if address still matches
       setTransactionData(transactionData || []);
-      setGasData(gasData || []);
+      setGasData(gasDataUsd || []);
       const totalTxs = transactionData.reduce((sum, day) => sum + day.transactions, 0);
       setTransactionCount(totalTxs);
+  
+      console.log('Transaction Data:', transactionData);
+      console.log('Gas Data (USD):', gasDataUsd);
     } catch (error) {
       console.error('Error fetching transaction data:', error);
-      setTransactionData([]);
-      setGasData([]);
+      // Only reset state if the address hasn't changed
+      if (requestedAddress === effectiveAddress) {
+        setTransactionData([]);
+        setGasData([]);
+      }
     } finally {
-      setIsLoading(false);
+      // Only clear loading if the address hasn't changed
+      if (requestedAddress === effectiveAddress) {
+        setIsLoading(false);
+      }
     }
   };
 
   const fetchStakingData = async () => {
-    if (!effectiveAddress || isStakingLoading) return; // Use effectiveAddress
+    if (!effectiveAddress || isStakingLoading) return;
     setIsStakingLoading(true);
-  
-    // Create a new array for staking data
-    const newStakingData: StakingPool[] = [];
+    const newStakingData = [];
   
     // Fetch APY and TVL from Curve API
     let curvePoolsData = {};
@@ -141,64 +188,70 @@ const Wallets = () => {
     }
   
     // Curve PYUSD/USDC
-    const GAUGE_PayPool_USDC = '0x9da75997624C697444958aDeD6790bfCa96Af19A';
     const PYUSD_USDC_POOL_ADDRESS = '0x383E6b4437b59fff47B619CBA855CA29342A8559';
-    const PayPoolBalanceData = {
-      jsonrpc: '2.0',
-      id: 2,
-      method: 'eth_call',
-      params: [
-        {
-          to: PYUSD_USDC_POOL_ADDRESS,
-          data: `0x70a08231${effectiveAddress.slice(2).padStart(64, '0')}`, // Use effectiveAddress
-        },
-        'latest',
-      ],
-    };
-    const PayPoolResponse = await fetch(RPC_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(PayPoolBalanceData),
-    });
-    const PayPoolResult = await PayPoolResponse.json();
-    console.log("PayPoolResult", PayPoolResult);
-    const PayPoolStake = PayPoolResult.result ? parseInt(PayPoolResult.result, 16) / 1e18 : 0;
-    console.log("PayPoolStake", PayPoolStake);
+    let payPoolStake = 0;
+    try {
+      const PayPoolBalanceData = {
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'eth_call',
+        params: [
+          {
+            to: PYUSD_USDC_POOL_ADDRESS,
+            data: `0x70a08231${effectiveAddress.slice(2).padStart(64, '0')}`,
+          },
+          'latest',
+        ],
+      };
+      const PayPoolResponse = await fetch(RPC_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(PayPoolBalanceData),
+      });
+      const PayPoolResult = await PayPoolResponse.json();
+      payPoolStake = PayPoolResult.result ? parseInt(PayPoolResult.result, 16) / 1e18 : 0;
+      console.log('PayPoolStake:', payPoolStake);
+    } catch (error) {
+      console.error('Error fetching Curve PYUSD/USDC stake:', error);
+      payPoolStake = 0;
+    }
   
     const usdcPoolData = curvePoolsData[PYUSD_USDC_POOL_ADDRESS.toLowerCase()] || {};
-    console.log("PayPoolData", usdcPoolData);
-  
     newStakingData.push({
       pool: 'Curve PYUSD/USDC',
-      stakeAmount: PayPoolStake,
-      apy: usdcPoolData.baseApy || 1.57,
-      tvl: usdcPoolData.tvl || 15110000,
+      stakeAmount: payPoolStake,
+      apy: usdcPoolData.baseApy || 1.57, // Fallback APY
+      tvl: usdcPoolData.tvl || 15110000, // Fallback TVL
     });
   
     // Curve PYUSD/crvUSD
-    const GAUGE_PYUSD_CRVUSD = '0xf69Fb60B79E463384b40dbFDFB633AB5a863C9A2';
     const PYUSD_CRVUSD_POOL_ADDRESS = '0x625E92624Bc2D88619ACCc1788365A69767f6200';
-    const curveCrvUsdBalanceData = {
-      jsonrpc: '2.0',
-      id: 3,
-      method: 'eth_call',
-      params: [
-        {
-          to: PYUSD_CRVUSD_POOL_ADDRESS,
-          data: `0x70a08231${effectiveAddress.slice(2).padStart(64, '0')}`, // Use effectiveAddress
-        },
-        'latest',
-      ],
-    };
-    const curveCrvUsdResponse = await fetch(RPC_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(curveCrvUsdBalanceData),
-    });
-    console.log("curveCrvUsdResponse", curveCrvUsdResponse);
-    const curveCrvUsdResult = await curveCrvUsdResponse.json();
-    const curveCrvUsdStake = curveCrvUsdResult.result ? parseInt(curveCrvUsdResult.result, 16) / 1e18 : 0;
-    console.log("curveCrvUsdStake", curveCrvUsdStake);
+    let curveCrvUsdStake = 0;
+    try {
+      const curveCrvUsdBalanceData = {
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'eth_call',
+        params: [
+          {
+            to: PYUSD_CRVUSD_POOL_ADDRESS,
+            data: `0x70a08231${effectiveAddress.slice(2).padStart(64, '0')}`,
+          },
+          'latest',
+        ],
+      };
+      const curveCrvUsdResponse = await fetch(RPC_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(curveCrvUsdBalanceData),
+      });
+      const curveCrvUsdResult = await curveCrvUsdResponse.json();
+      curveCrvUsdStake = curveCrvUsdResult.result ? parseInt(curveCrvUsdResult.result, 16) / 1e18 : 0;
+      console.log('curveCrvUsdStake:', curveCrvUsdStake);
+    } catch (error) {
+      console.error('Error fetching Curve PYUSD/crvUSD stake:', error);
+      curveCrvUsdStake = 0;
+    }
   
     const crvUsdPoolData = curvePoolsData[PYUSD_CRVUSD_POOL_ADDRESS.toLowerCase()] || {};
     newStakingData.push({
@@ -208,10 +261,108 @@ const Wallets = () => {
       tvl: crvUsdPoolData.tvl || 8000000,
     });
   
+    // Uniswap PYUSD/USDT
+    const UNISWAP_POOL_ADDRESS = '0xDd2e0D86A45e4EF9bd490c2809E6405720cC357c'; // Corrected from your earlier code
+    const PYUSD_ADDRESS = '0x6c3ea9036406852006290770bedfcaba0e23a0e8';
+    const USDT_ADDRESS = '0xdac17f958d2ee523a2206206994597c13d831ec7';
+    const FEE = 500;
+  
+    let totalStake = 0;
+    let uniswapApy = 0;
+    let uniswapTvl = 0;
+  
+    try {
+      // Fetch slot0
+      const slot0Data = {
+        jsonrpc: '2.0',
+        id: 4,
+        method: 'eth_call',
+        params: [{ to: UNISWAP_POOL_ADDRESS, data: '0x3850c7bd' }, 'latest'],
+      };
+      const slot0Response = await fetch(RPC_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(slot0Data),
+      });
+      const slot0Result = await slot0Response.json();
+      const slot0Hex = slot0Result.result || '0x0';
+      const sqrtPriceX96 = BigInt('0x' + slot0Hex.slice(2, 66));
+      const tick = BigInt.asIntN(24, BigInt('0x' + slot0Hex.slice(66, 130)));
+  
+      // Fetch positions
+      let positions = [];
+      try {
+        const response = await fetch('/api/stakingData', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            owner: effectiveAddress.toLowerCase(),
+            pool: UNISWAP_POOL_ADDRESS.toLowerCase(),
+          }),
+        });
+        if (!response.ok) throw new Error(`API returned ${response.status}`);
+        const data = await response.json();
+        positions = data.positions || [];
+        console.log('Uniswap positions:', positions);
+      } catch (error) {
+        console.error('Error fetching Uniswap positions:', error);
+      }
+  
+      // Calculate stake
+      const token0 = new Token(1, PYUSD_ADDRESS, 6, 'PYUSD', 'PayPal USD');
+      const token1 = new Token(1, USDT_ADDRESS, 6, 'USDT', 'Tether USD');
+      const pool = new Pool(token0, token1, FEE, sqrtPriceX96.toString(), 0, Number(tick));
+      for (const pos of positions) {
+        const position = new Position({
+          pool,
+          liquidity: pos.liquidity,
+          tickLower: pos.tickLower.tickIdx,
+          tickUpper: pos.tickUpper.tickIdx,
+        });
+        const amount0 = parseFloat(position.amount0.toSignificant(6));
+        const amount1 = parseFloat(position.amount1.toSignificant(6));
+        totalStake += amount0 + amount1;
+      }
+    } catch (error) {
+      console.error('Error calculating Uniswap stake:', error);
+      totalStake = 0;
+    }
+  
+    // Fetch APY and TVL from DefiLlama
+    try {
+      const defiLlamaResponse = await fetch('https://yields.llama.fi/pools');
+      const defiLlamaData = await defiLlamaResponse.json();
+      const uniswapPoolData = defiLlamaData.data.find(
+        (pool) => pool.pool.toLowerCase() === UNISWAP_POOL_ADDRESS.toLowerCase() && pool.chain === 'Ethereum'
+      );
+      if (uniswapPoolData) {
+        uniswapApy = uniswapPoolData.apy;
+        uniswapTvl = uniswapPoolData.tvlUsd;
+      } else {
+        console.warn('Uniswap pool not found in DefiLlama API, using fallback values');
+        uniswapApy = 0; // Fallback APY
+        uniswapTvl = 0; // Fallback TVL
+      }
+    } catch (error) {
+      console.error('Error fetching DefiLlama API:', error);
+      uniswapApy = 0;
+      uniswapTvl = 0;
+    }
+  
+    // Always push Uniswap pool, even with zero stake
+    newStakingData.push({
+      pool: 'Uniswap PYUSD/USDT',
+      stakeAmount: totalStake,
+      apy: uniswapApy,
+      tvl: uniswapTvl,
+    });
+  
     setStakingData(newStakingData);
     setIsStakingLoading(false);
     return newStakingData;
   };
+
+  
 
   useEffect(() => {
     if (effectiveAddress) {
@@ -297,23 +448,6 @@ const Wallets = () => {
     }
   };
 
-  const getMiraSuggestion = () => {
-    if (view === 'balance' && balance > 0 && transactionCount === 0) {
-      return {
-        text: 'Your idle PYUSD could have generated $250 in yield last month. Begin staking to boost performance score by 25%.',
-        action: 'Begin Staking',
-      };
-    } else if (view === 'gas' && transactionCount > 0) {
-      return {
-        text: 'Your last five PYUSD transactions could have been optimized by 20% using Mira X.',
-        action: 'Optimize with Mira X',
-      };
-    }
-    return { text: '', action: '' };
-  };
-
-  const suggestion = getMiraSuggestion();
-
   const handleMockAddressSubmit = () => {
     console.log("Mock address set:", tempMockAddress);
     setMockAddress(tempMockAddress);
@@ -331,266 +465,201 @@ const Wallets = () => {
   };
 
   return (
-    <div className={styles.walletContainer}>
-      {/* Mock Mode Banner */}
-      {mockAddress && (
-        <div className={styles.mockBanner}>
-          <span>
-            Mock Mode Active: Using address {mockAddress.slice(0, 6)}...{mockAddress.slice(-4)}
-          </span>
-          <button
-            className={styles.cancelMockButton}
-            onClick={() => setMockAddress(null)}
-          >
-            Exit Mock Mode
-          </button>
-        </div>
-      )}
-
-      {!isConnected ? (
-        <div className={styles.connectButton}>
-          <button onClick={() => walletModal.open()}>Connect a Wallet</button>
-        </div>
-      ) : (
-        <div className={styles.scrollWrapper}>
-          <div className={styles.scrollContainer} ref={scrollContainerRef}>
-            <section className={styles.snapSection}>
-              <div className={styles.performanceGrid}>
-                {/* Top Left: Wallet Balance + Activity */}
-                <div className={styles.leftTop}>
-                  <div className={styles.balance}>
-                    <span>
-                      <i className="fa-solid fa-dollar-sign"></i>
-                      <h3>Wallet Balance</h3>
-                    </span>
-                    <p>{balance ? `${balance} PYUSD` : 'Loading...'}</p>
-                  </div>
-                  <div className={styles.activityStat}>
-                    <span>
-                      <i className="fa-solid fa-dollar-sign"></i>
-                      <h3>Activity Status</h3>
-                    </span>
-                    <div className={styles.activityIndicator}>
-                      <p>{activityStatus}</p>
-                      <div
-                        className={styles.pulse}
-                        style={{ backgroundColor: getActivityColor(activityStatus) }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Top Center: Performance Score */}
-                <div className={styles.scoreContainer}>
-                  <svg width="80" height="80" viewBox="0 0 120 120">
-                    <defs>
-                      <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
-                        <feGaussianBlur in="SourceGraphic" stdDeviation="3" />
-                      </filter>
-                    </defs>
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#e6e6e6" strokeWidth="20" />
-                    <circle
-                      cx="60"
-                      cy="60"
-                      r="50"
-                      fill="none"
-                      stroke="#7BCFFF"
-                      strokeWidth="20"
-                      strokeDasharray={`${(score / 100) * 314}, 314`}
-                      transform="rotate(-90 60 60)"
-                      filter="url(#softGlow)"
-                    />
-                    <text
-                      x="60"
-                      y="60"
-                      textAnchor="middle"
-                      dy=".3em"
-                      fontSize="32"
-                      fill="white"
-                      fontFamily="Josefin Sans"
-                    >
-                      {score}
-                    </text>
-                  </svg>
-                </div>
-
-                {/* Top Right: Greeting + Mock Address + Disconnect */}
-                <div className={`${styles.rightTop} ${mockAddress ? styles.mockActive : ''}`}>
-                  <div className={styles.greeting}>
-                    Hi, {effectiveAddress?.slice(0, 6)}...{effectiveAddress?.slice(-4)}
-                  </div>
-
-                  {/* Mock Address UI */}
-                <div className={styles.mockContainer}>
-                    {mockAddress ? (
-                    <div className={styles.mockingState}>
-                        <span>Mocking...</span>
-                        <button
-                        className={styles.cancelMockButton}
-                        onClick={() => setMockAddress(null)} // Clear the mock address
-                        >
-                        Cancel
-                        </button>
-                    </div>
-                    ) : isMocking ? (
-                        <div className={styles.mockPrompt}>
-                        <input
-                          type="text"
-                          placeholder="Enter address to mock"
-                          className={styles.mockInput}
-                          value={tempMockAddress}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setTempMockAddress(value);
-                            if (value.match(/^0x[a-fA-F0-9]{40}$/)) {
-                              setShowConfirmDialog(true);
-                            }
-                          }}
-                        />
-                        <button
-                          className={styles.cancelMockButton}
-                          onClick={() => {
-                            setIsMocking(false);
-                            setTempMockAddress('');
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                    <div className={styles.noMock}>
-                        {/* <span>No Mock</span> */}
-                        <button
-                        className={styles.mockButton}
-                        onClick={() => setIsMocking(true)} // Open the prompt
-                        >
-                        Mock Address
-                        </button>
-                    </div>
-                    )}
-                </div>
-                  <button onClick={() => disconnect()} className={styles.disconnectBut}>
-                    <i className="fa-thin fa-user-minus"></i>
-                  </button>
-                </div>
-
-                {/* Confirmation Dialog */}
-                {showConfirmDialog && (
-                  <div className={styles.confirmDialog}>
-                    <div className={styles.confirmContent}>
-                      <p>
-                        You are about to mock address {tempMockAddress.slice(0, 6)}...{tempMockAddress.slice(-4)}.
-                        All data will reflect this address instead of your connected wallet. Continue?
-                      </p>
-                      <div className={styles.confirmButtons}>
-                        <button
-                          className={styles.confirmButton}
-                          onClick={handleMockAddressSubmit}
-                        >
-                          Yes
-                        </button>
-                        <button
-                          className={styles.cancelMockButton}
-                          onClick={() => {
-                            setShowConfirmDialog(false);
-                            setTempMockAddress('');
-                            setIsMocking(false);
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Main Container */}
-                <div className={styles.mainContainer}>
-                  <div className={styles.viewSelector}>
-                    <span>
-                      {view === 'balance'
-                        ? 'Transaction Reports'
-                        : view === 'staking'
-                        ? 'Staking'
-                        : 'Gas'}
-                    </span>
-                    <select value={view} onChange={(e) => setView(e.target.value)}>
-                      <option value="balance">Transaction Reports</option>
-                      <option value="staking">Staking</option>
-                      <option value="gas">Gas</option>
-                    </select>
-                  </div>
-
-                  {/* Loading States */}
-                  {isLoading && (view === 'balance' || view === 'gas') && (
-                    <div className={styles.loading}>Loading...</div>
-                  )}
-                  {isStakingLoading && view === 'staking' && (
-                    <div className={styles.loading}>Loading...</div>
-                  )}
-
-                  {/* No Data States */}
-                  {!isLoading && view === 'balance' && transactionData.every(d => d.transactions === 0) && (
-                    <div className={styles.noData}>No transaction data for user</div>
-                  )}
-                  {!isLoading && view === 'gas' && gasData.every(d => parseFloat(d.gas) === 0) && (
-                    <div className={styles.noData}>No gas data for user</div>
-                  )}
-                  {!isStakingLoading && view === 'staking' && stakingData.length === 0 && (
-                    <div className={styles.noData}>No staking data for user</div>
-                  )}
-
-                  {/* Charts */}
-                  {!isLoading && (view === 'balance' || view === 'gas') && (
-                    <ChartReports view={view} transactionData={transactionData} gasData={gasData} />
-                  )}
-                  {!isStakingLoading && view === 'staking' && stakingData.length > 0 && (
-                    <StakingChart stakingData={stakingData} address={effectiveAddress} />
-                  )}
-                </div>
-
-                {/* Mira AI */}
-                <div className={styles.mira}>
-                  <div className={styles.aiheading}>
-                    <h3>Mira AI</h3>
-                  </div>
-                  <p>{suggestion.text}</p>
-                  {suggestion.action && (
-                    <button className={styles.actionButton}>{suggestion.action}</button>
-                  )}
-                </div>
-              </div>
-            </section>
-
-            {/* <section className={styles.snapSection}>
-              <h2>Alerts</h2>
-              <p>Set an alert for:</p>
-              <ul>
-                <li>Gas Fees: High, Low, Neutral</li>
-                <li>LP Pool Yield: Above 10%</li>
-                <li>Arbitrage: Opportunity Detected</li>
-              </ul>
-              <button className={styles.actionButton}>Set Alert</button>
-            </section> */}
-          </div>
-
-          <div className={styles.navDots}>
-            {sections.map((section, index) => (
-              <div
-                key={index}
-                className={`${styles.dotContainer} ${
-                  activeSection === index ? styles.active : ''
-                }`}
-                onClick={() => scrollToSection(index)}
-              >
-                <div className={styles.dot}></div>
-                <span className={styles.tooltip}>{section}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+<div className={styles.walletContainer}>
+  {mockAddress && (
+    <div className={styles.mockBanner}>
+      <span>
+        Mock Mode Active: Using address {mockAddress.slice(0, 6)}...{mockAddress.slice(-4)}
+      </span>
+      <button className={styles.cancelMockButton} onClick={() => setMockAddress(null)}>
+        Exit Mock Mode
+      </button>
     </div>
+  )}
+
+  {!isConnected ? (
+    <div className={styles.connectButton}>
+      <button onClick={() => walletModal.open()}>Connect a Wallet</button>
+    </div>
+  ) : (
+    <div className={styles.performanceGrid}>
+      <div className={styles.leftTop}>
+        <div className={styles.balance}>
+          <span>
+            <i className="fa-solid fa-dollar-sign"></i>
+            <h3>Wallet Balance</h3>
+          </span>
+          <p>{balance ? `${balance} PYUSD` : 'Loading...'}</p>
+        </div>
+        <div className={styles.activityStat}>
+          <span>
+            <i className="fa-solid fa-dollar-sign"></i>
+            <h3>Activity Status</h3>
+          </span>
+          <div className={styles.activityIndicator}>
+            {isLoading ? (
+              <p>Loading...</p>
+            ) : (
+              <>
+                <p>{activityStatus}</p>
+                <div
+                  className={styles.pulse}
+                  style={{ backgroundColor: getActivityColor(activityStatus) }}
+                ></div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.scoreContainer}>
+        <svg width="80" height="80" viewBox="0 0 120 120">
+          <defs>
+            <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="3" />
+            </filter>
+          </defs>
+          <circle cx="60" cy="60" r="50" fill="none" stroke="#e6e6e6" strokeWidth="20" />
+          <circle
+            cx="60"
+            cy="60"
+            r="50"
+            fill="none"
+            stroke="#7BCFFF"
+            strokeWidth="20"
+            strokeDasharray={`${(score / 100) * 314}, 314`}
+            transform="rotate(-90 60 60)"
+            filter="url(#softGlow)"
+          />
+          <text
+            x="60"
+            y="60"
+            textAnchor="middle"
+            dy=".3em"
+            fontSize="32"
+            fill="white"
+            fontFamily="Josefin Sans"
+          >
+            {isLoading ? '...' : score}
+          </text>
+        </svg>
+      </div>
+
+      <div className={`${styles.rightTop} ${mockAddress ? styles.mockActive : ''}`}>
+        <div className={styles.greeting}>
+          Hi, {effectiveAddress?.slice(0, 6)}...{effectiveAddress?.slice(-4)}
+        </div>
+        <div className={styles.mockContainer}>
+          {mockAddress ? (
+            <div className={styles.mockingState}>
+              <span>Mocking...</span>
+              <button className={styles.cancelMockButton} onClick={() => setMockAddress(null)}>
+                Cancel
+              </button>
+            </div>
+          ) : isMocking ? (
+            <div className={styles.mockPrompt}>
+              <input
+                type="text"
+                placeholder="Enter address to mock"
+                className={styles.mockInput}
+                value={tempMockAddress}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setTempMockAddress(value);
+                  if (value.match(/^0x[a-fA-F0-9]{40}$/)) {
+                    setShowConfirmDialog(true);
+                  }
+                }}
+              />
+              <button
+                className={styles.cancelMockButton}
+                onClick={() => {
+                  setIsMocking(false);
+                  setTempMockAddress('');
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className={styles.noMock}>
+              <button className={styles.mockButton} onClick={() => setIsMocking(true)}>
+                Mock Address
+              </button>
+            </div>
+          )}
+        </div>
+        <button onClick={() => disconnect()} className={styles.disconnectBut}>
+          <i className="fa-thin fa-user-minus"></i>
+        </button>
+      </div>
+
+      {showConfirmDialog && (
+        <div className={styles.confirmDialog}>
+          <div className={styles.confirmContent}>
+            <p>
+              You are about to mock address {tempMockAddress.slice(0, 6)}...{tempMockAddress.slice(-4)}.
+              All data will reflect this address instead of your connected wallet. Continue?
+            </p>
+            <div className={styles.confirmButtons}>
+              <button className={styles.confirmButton} onClick={handleMockAddressSubmit}>
+                Yes
+              </button>
+              <button
+                className={styles.cancelMockButton}
+                onClick={() => {
+                  setShowConfirmDialog(false);
+                  setTempMockAddress('');
+                  setIsMocking(false);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className={styles.mainContainer}>
+        <div className={styles.viewSelector}>
+          <span>
+            {view === 'balance' ? 'Transaction Reports' : view === 'staking' ? 'Staking' : 'Gas'}
+          </span>
+          <select value={view} onChange={(e) => setView(e.target.value)}>
+            <option value="balance">Transaction Reports</option>
+            <option value="staking">Staking</option>
+            <option value="gas">Gas</option>
+          </select>
+        </div>
+
+        {isLoading && (view === 'balance' || view === 'gas') && (
+          <div className={styles.loading}>Loading...</div>
+        )}
+        {isStakingLoading && view === 'staking' && (
+          <div className={styles.loading}>Loading...</div>
+        )}
+
+        {!isLoading && view === 'balance' && transactionData.every(d => d.transactions === 0) && (
+          <div className={styles.noData}>No transaction data for user</div>
+        )}
+        {!isLoading && view === 'gas' && gasData.every(d => parseFloat(d.gas) === 0) && (
+          <div className={styles.noData}>No gas data for user</div>
+        )}
+        {!isStakingLoading && view === 'staking' && stakingData.length === 0 && (
+          <div className={styles.noData}>No staking data for user</div>
+        )}
+
+        {!isLoading && (view === 'balance' || view === 'gas') && (
+          <ChartReports view={view} transactionData={transactionData} gasData={gasData} />
+        )}
+        {!isStakingLoading && view === 'staking' && stakingData.length > 0 && (
+          <StakingChart stakingData={stakingData} address={effectiveAddress} />
+        )}
+      </div>
+    </div>
+  )}
+</div>
   );
 };
 

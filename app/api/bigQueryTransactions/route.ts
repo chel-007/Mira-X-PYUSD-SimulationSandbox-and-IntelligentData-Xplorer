@@ -21,7 +21,7 @@ if (!projectId) {
 const bigquery = new BigQuery({
   projectId: projectId,
   credentials: credentials,
-  location: "US", // Adjust if needed
+  location: "US",
 });
 
 export async function GET() {
@@ -29,7 +29,7 @@ export async function GET() {
     const dailyQuery = `
       #standardSQL
       SELECT DATE(TIMESTAMP_MILLIS(timestamp)) AS date, SUM(CAST(value AS FLOAT64)) AS value
-      FROM \`${projectId}.pyusd_data.transfer_logs\`
+      FROM \`${projectId}.pyusd_data.transfer_logs_\`
       WHERE TIMESTAMP_MILLIS(timestamp) >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
       GROUP BY date
       ORDER BY date
@@ -37,12 +37,11 @@ export async function GET() {
     const monthlyQuery = `
       #standardSQL
       SELECT FORMAT_TIMESTAMP('%Y-%m', TIMESTAMP_MILLIS(timestamp)) AS date, SUM(CAST(value AS FLOAT64)) AS value
-      FROM \`${projectId}.pyusd_data.transfer_logs\`
+      FROM \`${projectId}.pyusd_data.transfer_logs_\`
       GROUP BY date
       ORDER BY date
     `;
 
-    // New query for daily wallet growth
     const dailyWalletGrowthQuery = `
     SELECT 
       DATE(TIMESTAMP_MILLIS(first_tx)) AS date,
@@ -51,9 +50,9 @@ export async function GET() {
     FROM (
       SELECT MIN(timestamp) AS first_tx, wallet AS new_wallet
       FROM (
-        SELECT timestamp, sender AS wallet FROM \`${projectId}.pyusd_data.transfer_logs\`
+        SELECT timestamp, sender AS wallet FROM \`${projectId}.pyusd_data.transfer_logs_\`
         UNION ALL
-        SELECT timestamp, receiver AS wallet FROM \`${projectId}.pyusd_data.transfer_logs\`
+        SELECT timestamp, receiver AS wallet FROM \`${projectId}.pyusd_data.transfer_logs_\`
       )
       GROUP BY wallet
     )
@@ -63,28 +62,29 @@ export async function GET() {
 
     const hourlyVelocityQuery = `
       SELECT 
-        TIMESTAMP_TRUNC(TIMESTAMP_MILLIS(timestamp), HOUR) AS hour,
-        COUNT(*) AS tx_count
-      FROM \`${projectId}.pyusd_data.transfer_logs\`
-      GROUP BY hour
-      ORDER BY hour
+      tx_hash,
+      timestamp
+    FROM \`${projectId}.pyusd_data.transfer_logs_\`
+    WHERE timestamp >= UNIX_MILLIS(TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR))
+    ORDER BY timestamp DESC
     `;
+
     const activeWalletsQuery = `
       SELECT ARRAY_AGG(DISTINCT wallet) AS active_wallets
       FROM (
-        SELECT sender AS wallet FROM \`${projectId}.pyusd_data.transfer_logs\`
+        SELECT sender AS wallet FROM \`${projectId}.pyusd_data.transfer_logs_\`
         WHERE TIMESTAMP_MILLIS(timestamp) >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
         UNION ALL
-        SELECT receiver AS wallet FROM \`${projectId}.pyusd_data.transfer_logs\`
+        SELECT receiver AS wallet FROM \`${projectId}.pyusd_data.transfer_logs_\`
         WHERE TIMESTAMP_MILLIS(timestamp) >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
       )
     `;
     const totalWalletsQuery = `
       SELECT COUNT(DISTINCT wallet) AS total_wallets
       FROM (
-        SELECT sender AS wallet FROM \`${projectId}.pyusd_data.transfer_logs\`
+        SELECT sender AS wallet FROM \`${projectId}.pyusd_data.transfer_logs_\`
         UNION ALL
-        SELECT receiver AS wallet FROM \`${projectId}.pyusd_data.transfer_logs\`
+        SELECT receiver AS wallet FROM \`${projectId}.pyusd_data.transfer_logs_\`
       )
     `;
     
@@ -95,8 +95,6 @@ export async function GET() {
         DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) AS date,
         SUM(
           CASE
-            WHEN address = '0xdd2e0d86a45e4ef9bd490c2809e6405720cc357c' THEN
-              ABS(CAST(JSON_EXTRACT_SCALAR(args, '$[2]') AS BIGNUMERIC)) / 1e6
             WHEN address = '0x625e92624bc2d88619accc1788365a69767f6200' THEN
               CASE
                 WHEN CAST(JSON_EXTRACT_SCALAR(args, '$.sold_id') AS INT64) = 0 THEN
@@ -109,9 +107,9 @@ export async function GET() {
             ELSE 0
           END
         ) AS total_volume_usd
-      FROM \`${projectId}.pyusd_data.lp_activity_and_gas\`
+      FROM \`${projectId}.pyusd_data.lp_activity_and_gas_latest\`
       WHERE event_type = 'Swap'
-        AND DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)
+        AND DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) >= DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)
       GROUP BY pool_address, date
       ORDER BY date, pool_address
     `;
@@ -124,8 +122,6 @@ export async function GET() {
         COUNT(*) AS swap_count,
         SUM(
           CASE
-            WHEN address = '0xdd2e0d86a45e4ef9bd490c2809e6405720cc357c' THEN
-              ABS(CAST(JSON_EXTRACT_SCALAR(args, '$[2]') AS BIGNUMERIC)) / 1e6
             WHEN address = '0x625e92624bc2d88619accc1788365a69767f6200' THEN
               CASE
                 WHEN CAST(JSON_EXTRACT_SCALAR(args, '$.sold') AS INT64) = 0 THEN
@@ -138,9 +134,9 @@ export async function GET() {
             ELSE 0
           END
         ) AS total_volume_usd
-      FROM \`${projectId}.pyusd_data.lp_activity_and_gas\`
+      FROM \`${projectId}.pyusd_data.lp_activity_and_gas_latest\`
       WHERE event_type = 'Swap'
-        AND DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 DAY)
+        AND DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) >= DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)
       GROUP BY pool_address
     `;
 
@@ -149,21 +145,24 @@ export async function GET() {
       DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) AS event_date,
       event_type,
       AVG(CAST(gas_used AS INT64) * CAST(gas_price AS BIGNUMERIC) / 1e18) AS avg_gas_fee_eth,
-      COUNT(*) AS transaction_count
-    FROM \`${projectId}.pyusd_data.lp_activity_and_gas\`
+      COUNT(DISTINCT tx_hash) AS transaction_count,
+      ARRAY_AGG(tx_hash) AS tx_hashes
+    FROM \`${projectId}.pyusd_data.lp_activity_and_gas_latest\`
     WHERE event_type IN ('Transfer', 'Swap')
-      AND DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+      AND DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) >= DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY)
+
     GROUP BY event_date, event_type
     ORDER BY event_date, event_type
-    `;
+  `;
 
+        // AND DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) < CURRENT_DATE()
     const timeOfDayQuery = `
     SELECT
       DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) AS event_date,
       EXTRACT(HOUR FROM TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) AS hour_of_day,
       AVG(CAST(gas_used AS INT64) * CAST(gas_price AS BIGNUMERIC) / 1e18) AS avg_gas_fee_eth,
       COUNT(*) AS transaction_count
-    FROM \`${projectId}.pyusd_data.lp_activity_and_gas\`
+    FROM \`${projectId}.pyusd_data.lp_activity_and_gas_latest\`
     WHERE DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
     GROUP BY event_date, hour_of_day
     ORDER BY event_date, hour_of_day;
@@ -221,9 +220,14 @@ export async function GET() {
       newWallets: row.new_wallets,
       wallets: row.wallets,
     }));
+    // const hourlyVelocity = hourlyVelocityRows.map(row => ({
+    //   hour: row.hour.value,
+    //   txPerHour: row.tx_count,
+    // }));
+
     const hourlyVelocity = hourlyVelocityRows.map(row => ({
-      hour: row.hour.value,
-      txPerHour: row.tx_count,
+    txHash: row.tx_hash,
+    timestamp: row.timestamp
     }));
 
     const activeWallets = activeRows[0].active_wallets;
@@ -250,6 +254,7 @@ export async function GET() {
       event_type: row.event_type,
       avg_gas_fee_eth: parseFloat(row.avg_gas_fee_eth),
       transaction_count: parseInt(row.transaction_count),
+      tx_hash: row.tx_hash,
     }));
 
     const timeOfDayData = timeOfDayRows.map(row => ({
@@ -266,7 +271,9 @@ export async function GET() {
     //   transaction_count: parseInt(row.transaction_count),
     // }));
 
-    // console.log(activeWallets)
+    // console.log(swapVolumeData)
+    console.log(timeOfDayData)
+    console.log("gas", gasComparisonData)
     // console.log(totalWallets)
 
     return NextResponse.json({

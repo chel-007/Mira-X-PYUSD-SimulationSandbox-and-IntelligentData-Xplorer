@@ -1,0 +1,577 @@
+.walletContainer {
+    width: 100%;
+    height: 100%; 
+    background-color: rgba(129, 132, 153, 0.02); /* Match Transactions */
+    position: relative;
+    flex-grow: 0;
+    font-family: "Josefin Sans", sans-serif;
+  }
+
+  .connectButton {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 999;
+} 
+  .connectButton button {
+    padding: 12px 24px;
+    font-size: 14px;
+    background-color: rgba(129, 132, 153, 0.08);
+    border: 1px solid #7bcfff5a;
+    color: #7BCFFF;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  
+  .connectButton button:hover {
+    background-color: #357abd;
+    border: 1px solid #7bcfffcc;
+    color: aliceblue;
+    backdrop-filter: blur(50px);
+  }
+
+  .scrollWrapper {
+    height: 100%;
+    position: relative;
+  }
+  
+  .scrollContainer {
+    height: 100%;
+    overflow-y: hidden; /* Hide scrollbar */
+    scroll-snap-type: y mandatory;
+    
+  }
+  
+  .snapSection {
+    height: 100%;
+    scroll-snap-align: end;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .actionButton {
+    padding: 10px 20px;
+    font-size: 14px;
+    background-color: #4a90e2;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  
+  .actionButton:hover {
+    background-color: #7BCFFF;
+  }
+
+  /* Navigation Dots */
+.navDots {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.dotContainer {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(129, 132, 153, 0.4);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+}
+
+.dotContainer.active .dot {
+  background-color: #7BCFFF; /* #4a90e2;  Active dot color */
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  background-color: rgba(129, 132, 153, 0.5);
+  border-radius: 50%;
+  transition: background-color 0.3s;
+}
+
+.dotContainer:hover .tooltipSnap {
+  visibility: visible;
+  opacity: 1;
+}
+
+.tooltipSnap {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.3);
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+
+  /* Grid Layout for Performance Section */
+.performanceGrid {
+    display: grid;
+    grid-template-areas:
+      "leftTop score rightTop"
+      "main main mira"
+      "main main mira";
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: auto 1fr auto;
+    height: 100%;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
+    padding: 20px;
+    padding-top: 0px;
+    box-sizing: border-box;
+  }
+
+  .leftTop {
+    grid-area: leftTop;
+    /* padding: 10px; */
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+    text-align: left;
+  }
+  
+  .leftTop .balance {
+    border: 1px solid rgba(129, 132, 153, 0.1);
+    border-radius: 20px;
+    width: 60%;
+    padding: 10px 10px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+  }
+
+  .balance span {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    text-align: left;
+    align-items: center;
+    align-content: center;
+    align-self: start;
+  }
+  .balance i {
+    border: 1px solid rgba(129, 132, 153, 0.08);
+    border-radius: 50%;
+    width: 35px;
+    height: 35px;
+    text-align: center;
+    align-items: center;
+    align-content: center;
+  }
+
+  .balance p {
+    padding-left: 5px;
+    justify-self: end;
+  }
+
+
+  .leftTop .activityStat {
+    border: 1px solid rgba(129, 132, 153, 0.1);
+    border-radius: 20px;
+    width: 60%;
+    padding: 10px 10px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+  }
+
+  .activityStat span {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    text-align: left;
+    align-items: center;
+    align-content: center;
+    align-self: start;
+  }
+  .activityStat i {
+    border: 1px solid rgba(129, 132, 153, 0.08);
+    border-radius: 50%;
+    width: 35px;
+    height: 35px;
+    text-align: center;
+    align-items: center;
+    align-content: center;
+  }
+
+  .activityStat p {
+    justify-self: end;
+  }
+  
+  /* Score Container */
+  .scoreContainer {
+    grid-area: score;
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .score {
+    color: white;
+    font-size: 1.5rem;
+  }
+
+  .rightTop {
+    grid-area: rightTop;
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: end;
+    gap: 20px;
+  }
+
+  /* Mock Mode Indicator on rightTop */
+.mockActive {
+    border: 2px solid #ffeb3b; /* Yellow border to indicate mock mode */
+    border-radius: 10px;
+    padding: 5px;
+  }
+  
+  /* Mock Banner */
+  .mockBanner {
+    background-color: #ffeb3b;
+    color: #333;
+    padding: 10px;
+    text-align: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  /* Confirmation Dialog */
+  .confirmDialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+  
+  .confirmContent {
+    background-color: #1a1a1a;
+    padding: 20px;
+    border-radius: 10px;
+    border: 1px solid #7bcfff3f;
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+  }
+  
+  .confirmButtons {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  
+  .confirmButton {
+    background-color: rgba(76, 175, 80, 0.08); /* Green background for confirm */
+    border: 1px solid #4caf503f;
+    color: #4caf50;
+    border-radius: 20px;
+    padding: 5px 15px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+  }
+  
+  .confirmButton:hover {
+    background-color: rgba(76, 175, 80, 0.2);
+  }
+  
+  /* Existing Mock Address Styles (unchanged) */
+  .mockContainer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .noMock {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #7BCFFF;
+  }
+  
+  .mockButton {
+    background-color: rgba(129, 132, 153, 0.08);
+    border: 1px solid #7bcfff3f;
+    color: #7BCFFF;
+    border-radius: 20px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+  }
+  
+  .mockButton:hover {
+    background-color: rgba(167, 218, 255, 0.08);
+  }
+  
+  .mockPrompt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .mockInput {
+    background-color: rgba(129, 132, 153, 0.08);
+    border: 1px solid #7bcfff3f;
+    color: white;
+    border-radius: 5px;
+    padding: 5px 10px;
+    font-size: 14px;
+    width: 100px;
+  }
+  
+  .mockingState {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #4caf50;
+  }
+  
+  .cancelMockButton {
+    background-color: rgba(244, 67, 54, 0.08); /* Red background for cancel */
+    border: 1px solid #f443363f;
+    color: #f44336;
+    border-radius: 20px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+  }
+  
+  .cancelMockButton:hover {
+    background-color: rgba(244, 67, 54, 0.2);
+  }
+
+  .disconnectBut {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    background-color:rgba(129, 132, 153, 0.08);
+    border: 1px solid #7bcfff3f;
+    color: #7BCFFF;
+    border-radius: 50%;
+    cursor: pointer;
+    width: 50px;
+    height: 50px;
+  }
+
+  .disconnectBut:hover {
+    background-color: rgba(167, 218, 255, 0.08)
+  }
+
+  .disconnectBut i {
+    font-size: 1rem;
+  }
+
+/* Main: Spans two columns */
+.mainContainer {
+    grid-area: main;
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid rgba(129, 132, 153, 0.08);
+    /* border: 1px solid red !important; */
+    border-radius: 20px;
+    padding: 20px;
+    height: 100%;
+    width: 105%;
+  }
+  
+  .mira {
+    grid-area: mira;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 20px;
+    padding: 12px;
+    width: 90%;
+    justify-self: end;
+    height: 100%;
+  }
+
+  .mira .aiheading {
+    background-color: rgba(129, 132, 153, 0.06);
+    border-radius: 50px;
+    width: 100%;
+    height: 20%;
+    justify-content: center;
+    align-items: center;
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+  }
+  
+  .aiheading h3 {
+    font-size: 1.2rem;
+    font-family: "Josefin Sans", sans-serif;
+    padding: 0;
+  }
+  
+  .mira li {
+    margin: 10px 0;
+    color: #fff;
+  }
+
+  .pulse {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #05dd05;
+    box-shadow: 0 0 0 0 rgba(83, 255, 71, 0.5);
+    animation: pulse-kefe91md 2.5s infinite linear;
+    position: relative;
+    margin-right: 15px;
+ }
+ 
+ .pulse:before,
+ .pulse:after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: 0 0 0 0 rgba(83, 255, 71, 0.5);
+    animation: inherit;
+    animation-delay: -0.5s;
+ }
+ 
+ .pulse:after {
+    animation-delay: -1s;
+ }
+ 
+ @keyframes pulse-kefe91md {
+    100% {
+       box-shadow: 0 0 0 14px #0000;
+    }
+ }
+
+  .buttonContainer {
+    grid-area: buttons;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  /* Activity Indicator */
+.activityIndicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-left: 5px;
+  }
+  
+  .activityIndicator p {
+    color: white; /* White text */
+  }
+  
+  .activityIndicator .pulse {
+    width: 10px;
+    height: 10px;
+    align-self: center;
+    border-radius: 50%;
+    animation: pulseActivity 2s infinite;
+  }
+  
+  @keyframes pulseActivity {
+    0% {
+      box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+    }
+    70% {
+      box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+    }
+  }
+  
+  .viewSelector {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 40px;
+  }
+  
+  .viewSelector span {
+    font-size: 16px;
+    color: #fff;
+  }
+  
+  .viewSelector select {
+    background: rgba(129, 132, 153, 0.08);
+    border: 1px solid #7bcfff3f;
+    color: #7BCFFF;
+    padding: 5px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  .viewSelector select option {
+    background: rgba(129, 132, 153, 0.08);
+  }
+  
+  /* Tooltip for Gas Chart */
+  .tooltip {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 5px 10px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    visibility: hidden;
+    font-size: 12px;
+  }
+
+  .loading {
+    position: relative;
+    top: 50%;
+    text-align: center;
+    color: #818499;
+  }
+  
+  .noData {
+    position: relative;
+    top: 50%;
+    text-align: center;
+    color: #818499;
+  }
+
+
+
+
+

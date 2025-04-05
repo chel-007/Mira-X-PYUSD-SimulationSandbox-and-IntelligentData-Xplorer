@@ -1,10 +1,13 @@
 "use client";
+import React, { useState } from 'react';
 import styles from "./styles/Home.module.css";
 import { useRouter } from "next/navigation";
 import "./globals.css"
+import TelegramButton from "./TelegramButton";
 
 export default function Home() {
   const router = useRouter();
+  const [isOpen, setIsOpen] = useState(false);
 
   const handleTradeClick = () => router.push("/explore");
   const handleSandboxClick = () => router.push("/sandbox");
@@ -61,6 +64,7 @@ export default function Home() {
         <div className={styles.poweredBy}>Powered by PYUSD/GCP</div>
         <div className={styles.copyright}>© 2025 _</div>
       </footer>
+      <TelegramButton isOpen={isOpen} onClick={() => setIsOpen(!isOpen)} />
     </div>
   );
 }

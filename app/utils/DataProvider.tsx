@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from "r
 import { collection, onSnapshot, QuerySnapshot } from "firebase/firestore";
 import { db } from "../lib/clientFirestore";
 import { useEthPrice } from "../utils/EthPriceProvider";
+import { timeStamp } from "console";
 
 interface GasFeeOverTimeData {
   event_date: string;
@@ -11,6 +12,7 @@ interface GasFeeOverTimeData {
   avg_gas_fee_eth: number;
   avg_gas_fee_usd: number;
   transaction_count: number;
+  tx_hash: string;
 }
 
 interface TimeOfDayData {
@@ -173,8 +175,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }));
 
     const hourlyVelocity = bigQueryData.hourlyVelocity.map((row: any) => ({
-        hour: row.hour,
-        txPerHour: row.txPerHour,
+      txHash: row.tx_hash,
+      timestamp: row.timestamp
       }));
 
     // Process Wallet Growth (historical)
@@ -194,6 +196,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         avg_gas_fee_eth: avgGasFeeEth,
         avg_gas_fee_usd: ethPrice ? avgGasFeeEth * ethPrice : 0,
         transaction_count: parseInt(row.transaction_count),
+        tx_hash: row.tx_hash,
       };
     });
 
@@ -314,7 +317,7 @@ const activeWalletSet = new Set(historicalData.activeWallets);
         setTransfers(transactions);
 
         const now = new Date();
-        const oneHourAgo = now.getTime() - 3600000;
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000); // 60 minutes ago
         const thirtyDaysAgo = now.getTime() - 30 * 24 * 60 * 60 * 1000;
 
         // Check if collection is empty to trigger BigQuery refresh
@@ -329,24 +332,49 @@ const activeWalletSet = new Set(historicalData.activeWallets);
 
         prevTransferCountRef.current = snapshot.size;
 
-        console.log("prevtransfercountref", prevTransferCountRef.current)
+        // console.log("prevtransfercountref", prevTransferCountRef.current)
 
         // Update transaction velocity
         // Get the current hour truncated to match BigQuery's format (e.g., "2025-03-30 14:00:00 UTC")
-        const currentHour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours()).toISOString();
-        const historicalHour = historicalDataRef.current?.hourlyVelocity.find(row => row.hour === currentHour);
-        const historicalTxCount = historicalHour ? historicalHour.txPerHour : 0;
-        console.log("velocity now", currentHour)
-        console.log("velocityhour", historicalHour)
-        console.log("velocityhistory", historicalTxCount)
-        console.log("main velocity", historicalData.hourlyVelocity)
+        // const currentHour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours()).toISOString();
+        // const historicalHour = historicalDataRef.current?.hourlyVelocity.find(row => row.hour === currentHour);
+        // const historicalTxCount = historicalHour ? historicalHour.txPerHour : 0;
 
-        const recentTx = transactions.filter(t => new Date(t.timestamp).getTime() >= oneHourAgo);
-        const realTimeTxCount = recentTx.length;
+        // console.log("velocity now", currentHour)
+        // console.log("velocityhour", historicalHour)
+        // console.log("velocityhistory", historicalTxCount)
+        // console.log("main velocity", historicalData.hourlyVelocity)
 
-        const calculatedTxPerHour = historicalTxCount + realTimeTxCount;
-        setTxPerHour(calculatedTxPerHour);
-        setMaxTxPerHour(500);
+        // const recentTx = transactions.filter(t => new Date(t.timestamp).getTime() >= oneHourAgo);
+        // const realTimeTxCount = recentTx.length;
+        // console.log("realtimevelocity", realTimeTxCount)
+
+        // const calculatedTxPerHour = historicalTxCount + realTimeTxCount;
+        // setTxPerHour(calculatedTxPerHour);
+        // setMaxTxPerHour(500);
+// console.log("Now:", now.toISOString(), "OneHourAgo:", oneHourAgo.toISOString());
+
+// Normalize timestamps to milliseconds
+const allTx = [
+  ...historicalDataRef.current?.hourlyVelocity.map(t => ({
+    ...t,
+    timestampMs: t.timestamp, // Already in milliseconds from Big Query
+    timeStampString: new Date(t.timestamp).toISOString()
+  })),
+  ...transactions.map(t => ({
+    ...t,
+    timestampMs: new Date(t.timestamp).getTime() // Convert ISO string to milliseconds
+  }))
+];
+// console.log("historicalTx", historicalDataRef.current?.hourlyVelocity)
+// console.log("All transactions:", allTx);
+
+// Count transactions in the last 60 minutes
+const txInLastHour = allTx.filter(t => t.timestampMs >= oneHourAgo.getTime()).length;
+// console.log("Transactions in last hour:", txInLastHour);
+
+setTxPerHour(txInLastHour);
+setMaxTxPerHour(500); // Adjust as needed
 
         // Update Daily Volume (real-time)
         const dailyMap = transactions.reduce((acc: Record<string, number>, tx: any) => {
@@ -569,6 +597,7 @@ const activeWalletSet = new Set(historicalData.activeWallets);
       async (snapshot: QuerySnapshot<any>) => {
         const events = snapshot.docs.map((doc) => doc.data());
         setLpEvents(events);
+        // console.log("Raw events from Firestore:", events);
 
         const now = new Date();
         const thirtyDaysAgo = now.getTime() - 30 * 24 * 60 * 60 * 1000;
@@ -582,48 +611,69 @@ const activeWalletSet = new Set(historicalData.activeWallets);
           }, 3000);
         }
 
+        const normalizedEvents = events.map(event => ({
+          ...event,
+          block_timestamp: event.block_timestamp * 1000, // Convert seconds to ms
+        }));
+
+        // console.log("normalised", normalizedEvents)
+        // console.log("events", events)
+
 
         // Update Gas Fees Chart (real-time)
         // Update Gas Fees Chart (real-time)
-        const realTimeGasFees = events
-        .filter(e => e.block_timestamp >= thirtyDaysAgo)
-        .reduce((acc: Record<string, { [type: string]: { totalGasEth: number; count: number } }>, event: any) => {
+        const historicalGasses = historicalDataRef.current?.gasComparisonData || [];
+
+        // console.log("his", historicalGasses)
+
+        // Filter and process real-time gas fees
+        const realTimeGasFees = normalizedEvents
+          .filter(e => e.block_timestamp >= thirtyDaysAgo)
+          .filter(e => {
+            const date = new Date(e.block_timestamp).toISOString().split("T")[0];
+            const eventType = e.event_type;
+            const historicalTxHashes = historicalGasses
+              .find(h => h.event_date === date && h.event_type === eventType)?.tx_hash || [];
+            return !historicalTxHashes.includes(e.tx_hash);
+          })
+          .reduce((acc: Record<string, { [type: string]: { totalGasEth: number; count: number } }>, event: any) => {
             const date = new Date(event.block_timestamp).toISOString().split("T")[0];
             const eventType = event.event_type;
-            const gasPrice = Number(event.gas_price); // Ensure number
-            const gasUsed = Number(event.gas_used);   // Ensure number
+            const gasPrice = Number(event.gas_price);
+            const gasUsed = Number(event.gas_used);
             const gasFeeEth = (gasPrice * gasUsed) / 1e18;
-
+  
             if (isNaN(gasPrice) || isNaN(gasUsed) || isNaN(gasFeeEth)) {
-            console.warn(`Skipping invalid gas data for ${eventType} on ${date}`, { gasPrice, gasUsed });
-            return acc;
+              console.warn(`Skipping invalid gas data for ${eventType} on ${date}`, { gasPrice, gasUsed });
+              return acc;
             }
-
+  
             if (!acc[date]) acc[date] = {};
             if (!acc[date][eventType]) acc[date][eventType] = { totalGasEth: 0, count: 0 };
             acc[date][eventType].totalGasEth += gasFeeEth;
             acc[date][eventType].count += 1;
             return acc;
-        }, {});
-
+          }, {});
+  
         const realTimeGasFeeData = Object.entries(realTimeGasFees).flatMap(([date, types]) =>
-        Object.entries(types).map(([eventType, { totalGasEth, count }]) => {
-        const avgGasFeeEth = totalGasEth / count;
-        return {
-            event_date: date,
-            event_type: eventType,
-            avg_gas_fee_eth: avgGasFeeEth,
-            avg_gas_fee_usd: ethPrice ? avgGasFeeEth * ethPrice : 0,
-            transaction_count: count,
-        };
-        })
+          Object.entries(types).map(([eventType, { totalGasEth, count,  }]) => {
+            const avgGasFeeEth = totalGasEth / count;
+            return {
+              event_date: date,
+              event_type: eventType,
+              avg_gas_fee_eth: avgGasFeeEth,
+              avg_gas_fee_usd: ethPrice ? avgGasFeeEth * ethPrice : 0,
+              transaction_count: count,
+            };
+          })
         );
-        console.log("realtimegas", realTimeGasFeeData);
+  
+        // console.log("realtimegas", realTimeGasFeeData)
         setRealTimeGasFeeData(realTimeGasFeeData);
 
         // Update Time of Day Chart (real-time)
         // Update Time of Day Chart (real-time)
-        const realTimeTimeOfDay = events
+        const realTimeTimeOfDay = normalizedEvents
         .filter(e => e.block_timestamp >= thirtyDaysAgo)
         .reduce((acc: Record<string, { totalGasEth: number; totalGasUsd: number; count: number }>, event) => {
           // Ensure valid gas data
@@ -638,12 +688,12 @@ const activeWalletSet = new Set(historicalData.activeWallets);
       
           const date = new Date(event.block_timestamp);
           const eventDate = date.toISOString().split("T")[0]; // "2025-03-30"
-          console.log("eventdate", eventDate);
+          // console.log("eventdate", eventDate);
           const hourOfDay = date.getUTCHours();
           const gasFeeUsd = ethPrice ? gasFeeEth * ethPrice : 0;
       
           const key = `${eventDate}-${hourOfDay}`; // e.g., "2025-03-30-14"
-          console.log("key", key);
+          // console.log("key", key);
           if (!acc[key]) {
             acc[key] = { totalGasEth: 0, totalGasUsd: 0, count: 0 };
           }
@@ -658,7 +708,7 @@ const activeWalletSet = new Set(historicalData.activeWallets);
         const parts = key.split("-"); // ["2025", "03", "30-14"]
         const event_date = `${parts[0]}-${parts[1]}-${parts[2]}`; // "2025-03-30"
         const hour_of_day = parseInt(parts[3], 10); // 5
-        console.log('key parts', parts);
+        // console.log('key parts', parts);
         return {
           event_date, // Full date like "2025-03-30"
           hour_of_day, // Correct hour like 14
@@ -667,51 +717,59 @@ const activeWalletSet = new Set(historicalData.activeWallets);
           transaction_count: count,
         };
       });
-      console.log("realtimeofday", realTimeTimeOfDayData);
+      // console.log("realtimeofday", realTimeTimeOfDayData);
       setRealTimeTimeOfDay(realTimeTimeOfDayData);
 
         // Update Swap Volume Chart (real-time)
-        const realTimeSwapVolume = events
-          .filter(e => e.event_type === "Swap" && e.block_timestamp >= thirtyDaysAgo)
-          .reduce((acc: Record<string, { [pool: string]: number }>, event: any) => {
-            const date = new Date(event.block_timestamp).toISOString().split("T")[0];
-            const poolAddress = event.address.toLowerCase();
-            let volumeUsd = 0;
-            if (event.event_type === "Swap") {
-              if (poolAddress === UNISWAP_POOL) {
-                const amount0 = parseFloat(event.args[2]) / 1_000_000;
-                const amount1 = parseFloat(event.args[3]) / 1_000_000;
-                volumeUsd = Math.abs(amount0) + Math.abs(amount1);
-              } else if (poolAddress === CURVE_POOL_PYUSD_CRVUSD) {
-                const soldId = parseInt(event.args.sold_id);
-                const boughtId = parseInt(event.args.bought_id);
-                const tokensSoldDecimals = soldId === 0 ? 1_000_000 : 1_000_000_000_000_000_000;
-                const tokensBoughtDecimals = boughtId === 0 ? 1_000_000 : 1_000_000_000_000_000_000;
-                const tokensSold = parseFloat(event.args.tokens_sold) / tokensSoldDecimals;
-                const tokensBought = parseFloat(event.args.tokens_bought) / tokensBoughtDecimals;
-                volumeUsd = tokensSold + tokensBought;
-              } else if (poolAddress === CURVE_POOL_PYUSD_USDC) {
-                const tokensSold = parseFloat(event.args.tokens_sold) / 1_000_000;
-                const tokensBought = parseFloat(event.args.tokens_bought) / 1_000_000;
-                volumeUsd = tokensSold + tokensBought;
-              }
+        const realTimeSwapVolume = normalizedEvents
+        .filter(e => e.event_type === "Swap" && e.block_timestamp >= thirtyDaysAgo)
+        .reduce((acc: Record<string, { [pool: string]: number }>, event: any) => {
+          const date = new Date(event.block_timestamp).toISOString().split("T")[0];
+          const poolAddress = event.address.toLowerCase();
+          let volumeUsd = 0;
+      
+          // Log each swap event
+          // console.log(`Swap Event:`, {
+          //   date,
+          //   poolAddress,
+          //   args: event.args,
+          //   timestamp: event.block_timestamp,
+          //   txHash: event.tx_hash, // Assuming you have this in normalizedEvents
+          // });
+      
+          if (event.event_type === "Swap") {
+            if (poolAddress === UNISWAP_POOL) {
+              const amount0 = Number(event.args[2]) / 1_000_000; // USDT
+              const amount1 = Number(event.args[3]) / 1_000_000; // PYUSD
+              volumeUsd = Math.max(Math.abs(amount0), Math.abs(amount1));
+              console.log(`Uniswap Swap: amount0=${amount0}, amount1=${amount1}, volumeUsd=${volumeUsd}`);
+            } else if (poolAddress === CURVE_POOL_PYUSD_CRVUSD) {
+              const soldId = parseInt(event.args.sold_id);
+              const boughtId = parseInt(event.args.bought_id);
+              const tokensSoldDecimals = soldId === 0 ? 1_000_000 : 1_000_000_000_000_000_000;
+              const tokensBoughtDecimals = boughtId === 0 ? 1_000_000 : 1_000_000_000_000_000_000;
+              const tokensSold = parseFloat(event.args.tokens_sold) / tokensSoldDecimals;
+              const tokensBought = parseFloat(event.args.tokens_bought) / tokensBoughtDecimals;
+              volumeUsd = tokensSold; // Single-sided volume
+              // console.log(`Curve PYUSD/crvUSD: tokensSold=${tokensSold}, tokensBought=${tokensBought}, volumeUsd=${volumeUsd}`);
+            } else if (poolAddress === CURVE_POOL_PYUSD_USDC) {
+              const tokensSold = parseFloat(event.args.tokens_sold) / 1_000_000;
+              const tokensBought = parseFloat(event.args.tokens_bought) / 1_000_000;
+              volumeUsd = tokensSold; // Single-sided volume
+              // console.log(`Curve PYUSD/USDC: tokensSold=${tokensSold}, tokensBought=${tokensBought}, volumeUsd=${volumeUsd}`);
             }
-            if (!acc[date]) acc[date] = {};
-            acc[date][poolAddress] = (acc[date][poolAddress] || 0) + volumeUsd;
-            return acc;
-          }, {});
-
-        const realTimeSwapVolumeData = Object.entries(realTimeSwapVolume).flatMap(([date, pools]) =>
-          Object.entries(pools).map(([pool_address, total_volume_usd]) => ({
-            pool_address,
-            date,
-            total_volume_usd,
-          }))
-        );
+          }
+      
+          if (!acc[date]) acc[date] = {};
+          acc[date][poolAddress] = (acc[date][poolAddress] || 0) + volumeUsd;
+          return acc;
+        }, {});
+      
+      // console.log("realtimeswapvolume", realTimeSwapVolume);
         setRealTimeSwapVolumeData(realTimeSwapVolumeData);
 
         // Update Pool Metrics Chart (real-time)
-        const realTimePoolMetrics = events
+        const realTimePoolMetrics = normalizedEvents
           .filter(e => e.event_type === "Swap" && e.block_timestamp >= thirtyDaysAgo)
           .reduce((acc: Record<string, { medianGasFees: number[]; swap_count: number; total_volume_usd: number }>, event: any) => {
             const poolAddress = event.address.toLowerCase();
@@ -736,6 +794,7 @@ const activeWalletSet = new Set(historicalData.activeWallets);
                 volumeUsd = tokensSold + tokensBought;
               }
             }
+            // console.log("realtimepoolmetrics =events", realTimePoolMetrics)
             if (!acc[poolAddress]) {
               acc[poolAddress] = { medianGasFees: [], swap_count: 0, total_volume_usd: 0 };
             }
@@ -757,6 +816,7 @@ const activeWalletSet = new Set(historicalData.activeWallets);
             apr: 0, // Will be updated with Curve API data
           };
         });
+        // console.log("realtimepoolmetrics", realTimePoolMetrics);
         setRealTimePoolMetricsData(realTimePoolMetricsData);
         setRealTimeLoading(false);
       },
@@ -830,11 +890,11 @@ const activeWalletSet = new Set(historicalData.activeWallets);
   useEffect(() => {
     setActiveWallets(realTimeActiveWallets);
     setDormantWallets(realTimeDormantWallets);
-    console.log("Combined Active/Dormant:", {
-      activeWallets: realTimeActiveWallets,
-      dormantWallets: realTimeDormantWallets,
-      totalWallets: realTimeActiveWallets + realTimeDormantWallets,
-    });
+    // console.log("Combined Active/Dormant:", {
+    //   activeWallets: realTimeActiveWallets,
+    //   dormantWallets: realTimeDormantWallets,
+    //   totalWallets: realTimeActiveWallets + realTimeDormantWallets,
+    // });
   }, [realTimeActiveWallets, realTimeDormantWallets]);
 
   // Combine historical and real-time data for Active and Dormant Wallets
@@ -853,24 +913,25 @@ const activeWalletSet = new Set(historicalData.activeWallets);
 
   // Combine historical and real-time data for Gas Fees
   useEffect(() => {
-    const combinedGasFeeData = [...historicalGasFeeData];
+    const combinedGasFeeData = [...historicalDataRef.current?.gasComparisonData || []];
     realTimeGasFeeData.forEach(rt => {
       const existing = combinedGasFeeData.find(
         d => d.event_date === rt.event_date && d.event_type === rt.event_type
       );
       if (existing) {
-        existing.avg_gas_fee_eth =
-          (existing.avg_gas_fee_eth * existing.transaction_count +
-            rt.avg_gas_fee_eth * rt.transaction_count) /
-          (existing.transaction_count + rt.transaction_count);
+        const totalGasEth =
+          (existing.avg_gas_fee_eth * existing.transaction_count) +
+          (rt.avg_gas_fee_eth * rt.transaction_count);
+        const totalCount = existing.transaction_count + rt.transaction_count;
+        existing.avg_gas_fee_eth = totalGasEth / totalCount;
         existing.avg_gas_fee_usd = ethPrice ? existing.avg_gas_fee_eth * ethPrice : 0;
-        existing.transaction_count += rt.transaction_count;
+        existing.transaction_count = totalCount;
       } else {
         combinedGasFeeData.push(rt);
       }
     });
     setGasFeesData(combinedGasFeeData.sort((a, b) => a.event_date.localeCompare(b.event_date)));
-  }, [historicalGasFeeData, realTimeGasFeeData, ethPrice]);
+  }, [historicalDataRef.current?.gasComparisonData, realTimeGasFeeData, ethPrice]);
 
   // Combine historical and real-time data for Time of Day
   useEffect(() => {

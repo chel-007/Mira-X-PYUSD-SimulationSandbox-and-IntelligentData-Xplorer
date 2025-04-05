@@ -7,13 +7,12 @@ import { useTransactionTrace } from './useTransactionTrace';
 import LatestTxScroller from './latestTxScroller';
 import { useChainId, useAccount } from 'wagmi';
 import { useTransactionSimulation } from './useTransactionSimulation';
-import MiraAISuggestions from './miraAISuggestions';
 import { useSimulation } from '../../utils/SimulationContext';
 import SimulationResultBox from './SimulationResultBox';
 import { useData } from '../../utils/DataProvider';
 import { ToastContainer, toast } from 'react-toastify';
-import { SimulationProvider } from "../utils/SimulationContext";
-import 'react-toastify/dist/ReactToastify.css'; // Import default styles
+import { useEthPrice } from "../../utils/EthPriceProvider";
+import 'react-toastify/dist/ReactToastify.css';
 
 const gcpProjectId = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT_ID;
 const gcpApiKey = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_KEY;
@@ -275,13 +274,46 @@ const transactionInputs = {
     { label: 'Amount', xOffset: 200, yOffset: 100 },
   ],
   Swap: [
-    { label: 'From', xOffset: 150, yOffset: 200 },
-    { label: 'To', xOffset: 250, yOffset: 200 },
-    { label: 'AmountIn', xOffset: 200, yOffset: 300 },
-    { label: 'AmountOut', xOffset: 200, yOffset: 400 },
+    { label: 'From', xOffset: 0, yOffset: 50 },
+    { label: 'Select Pair', type: 'selector', options: ['USDT to PYUSD', 'USDC to PYUSD', 'crvUSD to PYUSD'], xOffset: 200, yOffset: 50 },
+    // { label: 'To', xOffset: 400, yOffset: 50 },
+    { label: 'AmountIn', xOffset: 0, yOffset: 150 },
+    { label: 'AmountOut', xOffset: 400, yOffset: 50 },
   ],
 };
 
+const SelectorNode = ({ data, id }) => {
+  const [selectedOption, setSelectedOption] = useState(data.options[0]); // Default to first option
+
+  useEffect(() => {
+    // Set initial selection
+    if (data.onSelect) {
+      const inputToken = data.options[0].split(' to ')[0]; // "USDT"
+      data.onSelect(data.options[0]); // Trigger onSelect with first option
+    }
+  }, []); // Run once on mount
+
+  const handleChange = (e) => {
+    const value = e.target.value;
+    console.log('Selector changed to:', value); // Debug
+    setSelectedOption(value);
+    if (data.onSelect) {
+      data.onSelect(value); // Update mockInputs
+    }
+  };
+
+  return (
+    <div className={styles.selectorNode}>
+      <select value={selectedOption} onChange={handleChange}>
+        {data.options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+};
 
 
 // Parse trace data
@@ -334,16 +366,14 @@ const InputNode = ({ data, id }) => {
   const [lastAlertTime, setLastAlertTime] = useState(0);
   const inputRef = useRef(null);
 
-  // Sync local value with data.value whenever it changes
   useEffect(() => {
     setValue(data.value || '');
   }, [data.value]);
 
   const handleChange = (e) => {
-    if (!data.isWalletConnected) {
+    if (!data.isWalletConnected || data.readOnly) {
       const now = Date.now();
-      if (now - lastAlertTime > 1000) {
-        // console.log("Toast triggered: Please connect your wallet first!");
+      if (!data.isWalletConnected && now - lastAlertTime > 1000) {
         toast.error("Please connect your wallet first!", {
           position: "top-right",
           autoClose: 5000,
@@ -364,10 +394,9 @@ const InputNode = ({ data, id }) => {
   };
 
   const handleFocus = (e) => {
-    if (!data.isWalletConnected) {
+    if (!data.isWalletConnected || data.readOnly) {
       const now = Date.now();
-      if (now - lastAlertTime > 1000) {
-        // console.log("Toast triggered: Please connect your wallet first!");
+      if (!data.isWalletConnected && now - lastAlertTime > 1000) {
         toast.error("Please connect your wallet first!", {
           position: "top-right",
           autoClose: 5000,
@@ -396,36 +425,80 @@ const InputNode = ({ data, id }) => {
         value={value}
         onChange={handleChange}
         onFocus={handleFocus}
-        className={!data.isWalletConnected ? styles.disabledInput : ''}
-        title={!data.isWalletConnected ? "Please connect your wallet first" : ""}
+        className={!data.isWalletConnected || data.readOnly ? styles.disabledInput : ''}
+        readOnly={data.readOnly}
+        title={
+          !data.isWalletConnected
+            ? "Please connect your wallet first"
+            : data.readOnly
+            ? "This field is read-only"
+            : ""
+        }
       />
       <Handle type="source" position={Position.Bottom} style={{ background: '#00ffcc' }} />
+      <Handle type="target" position={Position.Bottom} id="bottom-target" style={{ background: '#00ffcc' }} /> {/* Add bottom target */}
     </div>
   );
 };
 
 const MockButtonNode = ({ data, id }) => {
   const [loading, setLoading] = useState(false);
-  const { simulateTransfer } = useTransactionSimulation(data.rpcUrl);
+  const { simulateTransfer, simulateSwap } = useTransactionSimulation(data.rpcUrl);
   const { setSimulationResult, clearSimulation } = useSimulation();
+  const isSwap = data.inputs?.AmountIn;
+
+  console.log("amountin?",data.inputs?.AmountIn);
+  console.log("inputs?",data.inputs);
 
   const handleMock = async () => {
     setLoading(true);
     clearSimulation();
-    const { From, To, Amount } = data.inputs || {};
-    if (!From || !To || !Amount) {
-      setSimulationResult({ error: 'Missing required fields' });
-      setLoading(false);
-      return;
-    }
-    try {
-      const result = await simulateTransfer(From, To, String(Amount), data.isMainnet);
-      console.log('Simulation Result:', result);
-      setSimulationResult(result); // Set to context, not local state
-    } catch (error) {
-      setSimulationResult({ error: error.message });
-    } finally {
-      setLoading(false);
+    const { From, To, Amount, AmountIn, AmountOut, inputToken } = data.inputs || {};
+    console.log("inputtoken", inputToken)
+
+    if (isSwap) {
+      if (!From || !AmountIn || !inputToken) {
+        setSimulationResult({ error: 'Missing required swap fields' });
+        setLoading(false);
+        return;
+      }
+      try {
+        const result = await simulateSwap(
+          From,              // from
+          To || From,        // to (default to sender if not provided)
+          String(AmountIn),  // amountIn (ensure string)
+          data.isMainnet,    // isMainnet
+          inputToken         // tokenIn
+        );
+        console.log("simulation result", result)
+        setSimulationResult(result);
+        // setNodes((nds) =>
+        //   nds.map((node) =>
+        //     node.data.key === 'AmountOut'
+        //       ? { ...node, data: { ...node.data, value: result.amountOut } }
+        //       : node
+        //   )
+        // );
+      } catch (error) {
+        setSimulationResult({ error: error.message });
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      if (!From || !To || !Amount) {
+        setSimulationResult({ error: 'Missing required transfer fields' });
+        setLoading(false);
+        return;
+      }
+      try {
+        const result = await simulateTransfer(From, To, String(Amount), data.isMainnet);
+        console.log('Transfer Simulation Result:', result);
+        setSimulationResult(result);
+      } catch (error) {
+        setSimulationResult({ error: error.message });
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -433,7 +506,7 @@ const MockButtonNode = ({ data, id }) => {
     <div className={styles.mockButtonNode}>
       <Handle type="target" position={Position.Top} style={{ background: '#00ffcc' }} />
       <button onClick={handleMock} disabled={loading} style={{ background: 'green' }}>
-        {loading ? <i className="fa-spin fa-spinner" /> : 'Simulate'}
+        {loading ? <i className="fa-spin fa-spinner" /> : isSwap ? 'Simulate Swap' : 'Simulate'}
       </button>
       <Handle type="source" position={Position.Bottom} style={{ background: '#00ffcc' }} />
     </div>
@@ -454,17 +527,18 @@ const nodeTypes = {
   table: TableNode,
   traceContainer: TraceContainerNode,
   mockButton: MockButtonNode,
+  selector: SelectorNode, // Add this
 };
 
 const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, setEdges: any, nodes: CustomNode[], edges: Edge[] }) => {
   const { trace, receipt, loading, error, resetTrace, fetchTrace } = useTransactionTrace();
   const { setSimulationResult, clearSimulation } = useSimulation();
-  // console.log('useTransactionTrace output:', { trace, receipt, loading, error, resetTrace, fetchTrace });
   const [fetchingNodeId, setFetchingNodeId] = useState(null);
   const { setCenter } = useReactFlow();
   const chainId = useChainId();
   const { address } = useAccount();
   const { timeOfDay, gasFeeData, poolMetricsData } = useData();
+    const { ethPrice, loading: ethPriceLoading } = useEthPrice();
   const [mockInputs, setMockInputs] = useState({});
   const [amountNodeId, setAmountNodeId] = useState(null); // Track Amount node ID
 
@@ -490,8 +564,8 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
     }
     setMockInputs((prev) => {
       const newInputs = { ...prev, [label]: value };
-      // console.log('mockInputs updated:', newInputs);
-      if (label === 'Amount') {
+      console.log('mockInputs updated:', newInputs);
+      if (label === 'Amount' || label === 'AmountIn') {
         setAmountNodeId(nodeId);
       }
       setNodes((nds) =>
@@ -520,76 +594,87 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
 
   useEffect(() => {
     const existingMockNode = nodes.find((n) => n.type === 'mockButton');
+    if (existingMockNode && existingMockNode.data.inputs !== mockInputs) {
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === existingMockNode.id
+            ? { ...n, data: { ...n.data, inputs: mockInputs } }
+            : n
+        )
+      );
+    }
+  }, [mockInputs, nodes, setNodes]);
+
+  useEffect(() => {
+    const swapSelectorNode = nodes.find((n) => n.type === 'selector' && n.data.label === 'Select Pair');
+    if (swapSelectorNode && !mockInputs.inputToken) {
+      const defaultInputToken = swapSelectorNode.data.options[0].split(' to ')[0]; // "USDT"
+      setMockInputs((prev) => ({
+        ...prev,
+        inputToken: defaultInputToken,
+      }));
+    }
+  
+    const existingMockNode = nodes.find((n) => n.type === 'mockButton');
     const amountNode = amountNodeId ? nodes.find((n) => n.id === amountNodeId) : null;
-    const hasAllFields = !!(mockInputs.From && mockInputs.To && mockInputs.Amount);
-    const isValidInputs = hasAllFields &&
+    const isSwap = nodes.some((n) => n.type === 'input' && n.data.label === 'AmountIn');
+    const hasAllFields = isSwap
+      ? !!(mockInputs.From && mockInputs.AmountIn && mockInputs.inputToken)
+      : !!(mockInputs.From && mockInputs.To && mockInputs.Amount);
+    const isValidInputs =
+      hasAllFields &&
       isValidEthAddress(mockInputs.From) &&
-      isValidEthAddress(mockInputs.To) &&
-      mockInputs.From !== mockInputs.To &&
-      parseFloat(mockInputs.Amount) > 0;
-
-    // console.log('useEffect - mockInputs:', mockInputs);
-    // console.log('useEffect - hasAllFields:', hasAllFields);
-    // console.log('useEffect - isValidInputs:', isValidInputs);
-
+      (isSwap ? parseFloat(mockInputs.AmountIn) > 0 : parseFloat(mockInputs.Amount) > 0);
+  
+    console.log('useEffect debug:', { mockInputs, hasAllFields, isValidInputs, amountNodeId, amountNode, existingMockNode });
+  
     if (!isWalletConnected) {
-      // console.log('Wallet not connected, skipping MockButtonNode logic');
       if (existingMockNode) {
         setNodes((nds) => nds.filter((n) => n.id !== existingMockNode.id));
         setEdges((eds) => eds.filter((e) => e.target !== existingMockNode.id));
       }
       return;
     }
-
+  
     if (existingMockNode && !isValidInputs) {
-      // console.log('Removing MockButtonNode due to invalid inputs');
       setNodes((nds) => nds.filter((n) => n.id !== existingMockNode.id));
       setEdges((eds) => eds.filter((e) => e.target !== existingMockNode.id));
       return;
     }
-
-    if (isValidInputs && amountNode) {
-      const mockId = existingMockNode ? existingMockNode.id : `${Date.now()}-mock`;
+  
+    if (isValidInputs && amountNode && !existingMockNode) {
+      const mockId = `${Date.now()}-mock`;
       const mockPosition = {
         x: amountNode.position.x,
         y: amountNode.position.y + MOCK_BUTTON_Y_OFFSET,
       };
-
-      // console.log('Adding/updating MockButtonNode with inputs:', mockInputs);
+  
       setNodes((nds) => {
-        const updatedNodes = existingMockNode
-          ? nds.map((n) =>
-              n.id === mockId
-                ? { ...n, data: { ...n.data, inputs: mockInputs }, position: mockPosition }
-                : n
-            )
-          : [
-              ...nds,
-              {
-                id: mockId,
-                type: 'mockButton',
-                data: {
-                  inputs: mockInputs,
-                  isMainnet,
-                  rpcUrl,
-                  useData: () => ({ timeOfDay, swapVolumeData }),
-                },
-                position: mockPosition,
-              },
-            ];
+        const updatedNodes = [
+          ...nds,
+          {
+            id: mockId,
+            type: 'mockButton',
+            data: {
+              inputs: mockInputs,
+              isMainnet,
+              rpcUrl,
+              ethPrice,
+              useData: () => ({ timeOfDay, gasFeeData, poolMetricsData }),
+            },
+            position: mockPosition,
+          },
+        ];
+        console.log('MockButton added:', updatedNodes.find((n) => n.id === mockId));
         return updatedNodes;
       });
-
-      setEdges((eds) => {
-        const edgeId = `e${amountNode.id}-${mockId}`;
-        const existingEdge = eds.find((e) => e.id === edgeId);
-        if (!existingEdge) {
-          return [...eds.filter((e) => e.target !== mockId), { id: edgeId, source: amountNode.id, target: mockId, animated: true }];
-        }
-        return eds;
-      });
+  
+      setEdges((eds) => [
+        ...eds,
+        { id: `e${amountNode.id}-${mockId}`, source: amountNode.id, target: mockId, animated: true },
+      ]);
     }
-  }, [mockInputs, amountNodeId, setNodes, setEdges, isMainnet, rpcUrl, timeOfDay, isWalletConnected]);
+  }, [mockInputs, amountNodeId, setNodes, setEdges, isMainnet, rpcUrl, timeOfDay, isWalletConnected, ethPrice, nodes]);
 
   const addInitialOptionsNode = (x, y) => {
     const newNode = {
@@ -697,20 +782,39 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
                                 if (option in transactionInputs) {
                                   const inputs = transactionInputs[option];
                                   const inputNodes = inputs.map((input) => {
-                                    const inputId = `${Date.now()}-${input.label.toLowerCase()}`;
-                                    return {
-                                      id: inputId,
-                                      type: 'input',
-                                      data: {
-                                        label: input.label,
-                                        onChange: (label, value, id) => handleInputChange(label, value, id),
-                                        onFocus: () => handleFocus(input.label, inputId),
-                                        isWalletConnected, // Pass wallet connection status
-                                      },
-                                      position: { x: mockNode.position.x + input.xOffset, y: mockNode.position.y + input.yOffset },
-                                    };
+                                    const inputId = `${Date.now()}-${input.label.toLowerCase().replace(' ', '-')}`;
+                                    if (input.type === 'selector') {
+                                      return {
+                                        id: inputId,
+                                        type: 'selector',
+                                        data: {
+                                          label: input.label,
+                                          options: input.options,
+                                          onSelect: (value) => {
+                                            const inputToken = value.split(' to ')[0]; // e.g., "USDT"
+                                            setMockInputs((prev) => ({ ...prev, inputToken }));
+                                          },
+                                        },
+                                        position: { x: mockNode.position.x + input.xOffset, y: mockNode.position.y + input.yOffset },
+                                        draggable: false,
+                                      };
+                                    } else {
+                                      return {
+                                        id: inputId,
+                                        type: 'input',
+                                        data: {
+                                          label: input.label,
+                                          key: input.label,
+                                          onChange: (label, value, id) => handleInputChange(label, value, id),
+                                          onFocus: () => handleFocus(input.label, inputId),
+                                          isWalletConnected,
+                                          readOnly: input.readOnly || false,
+                                        },
+                                        position: { x: mockNode.position.x + input.xOffset, y: mockNode.position.y + input.yOffset },
+                                      };
+                                    }
                                   });
-
+                                
                                   newNodes = [
                                     ...nds.filter((n) => n.id !== mockId),
                                     {
@@ -721,16 +825,36 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
                                     },
                                     ...inputNodes,
                                   ];
-
-                                  newEdges = [
-                                    { id: `e${parentId}-${optionId}`, source: parentId, target: optionId, animated: true },
-                                    ...inputNodes.map((node) => ({
-                                      id: `e${optionId}-${node.id}`,
-                                      source: optionId,
-                                      target: node.id,
-                                      animated: true,
-                                    })),
-                                  ];
+                                
+                                  const isSwap = option === 'Swap';
+                                  if (isSwap) {
+                                    newEdges = [
+                                      { id: `e${parentId}-${optionId}`, source: parentId, target: optionId, animated: true }, // Mock TX to Swap
+                                      { id: `e${optionId}-${inputNodes[0].id}`, source: optionId, target: inputNodes[0].id, animated: true }, // Swap to From
+                                      { id: `e${inputNodes[0].id}-${inputNodes[2].id}`, source: inputNodes[0].id, target: inputNodes[2].id, animated: true }, // From to AmountIn
+                                      { id: `e${optionId}-${inputNodes[3].id}`, source: optionId, target: inputNodes[3].id, animated: true }, // From to AmountOut
+                                      // {
+                                      //   id: `e${inputNodes[2].id}-${inputNodes[3].id}`,
+                                      //   source: inputNodes[2].id,
+                                      //   target: inputNodes[3].id,
+                                      //   targetHandle: 'bottom',
+                                      //   animated: true,
+                                      // },
+                                    ];
+                                  } else {
+                                    newEdges = [
+                                      { id: `e${parentId}-${optionId}`, source: parentId, target: optionId, animated: true },
+                                      ...inputNodes.map((node) => ({
+                                        id: `e${optionId}-${node.id}`,
+                                        source: optionId,
+                                        target: node.id,
+                                        animated: true,
+                                      })),
+                                    ];
+                                  }
+                                
+                                  setEdges((eds) => [...eds, ...newEdges]);
+                                  return newNodes;
                                 } else {
                                   newNodes = [
                                     ...nds.filter((n) => n.id !== mockId),
@@ -1055,7 +1179,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
         <div className={styles.centerButton}>
           <button
             className={styles.plusButton}
-            onClick={() => addInitialOptionsNode(400, 300)}
+            onClick={() => addInitialOptionsNode(200, 100)}
           >
             <i className="fa-sharp fa-light fa-plus"></i>
           </button>

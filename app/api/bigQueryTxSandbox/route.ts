@@ -20,7 +20,7 @@ if (!projectId) {
 const bigquery = new BigQuery({
   projectId: projectId,
   credentials: credentials,
-  location: "US", // Adjust if needed
+  location: "US",
 });
 
 
@@ -32,18 +32,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ transactionData: [], gasData: [] }, { status: 400 });
   }
 
-  // Get the latest timestamp
-  const latestQuery = `
+  const latestQueryTx = `
     SELECT MAX(timestamp) AS latest_timestamp
-    FROM \`${projectId}.pyusd_data.transfer_logs\`
+    FROM \`${projectId}.pyusd_data.transfer_logs_\`
   `;
-  const [latestRows] = await bigquery.query({ query: latestQuery });
-  const latestTimestamp = latestRows[0]?.latest_timestamp || Date.now();
-  const endDate = new Date(latestTimestamp);
-  const startDate = new Date(endDate);
-  startDate.setDate(endDate.getDate() - 6); // 6 days back + endDate = 7 days
+  const latestQueryGas = `
+    SELECT MAX(block_timestamp) AS latest_timestamp
+    FROM \`${projectId}.pyusd_data.lp_activity_and_gas\`
+  `;
+  const [[txLatest], [gasLatest]] = await Promise.all([
+    bigquery.query({ query: latestQueryTx }),
+    bigquery.query({ query: latestQueryGas }),
+  ]);
+  const latestTxMs = txLatest[0]?.latest_timestamp || Date.now();
+  const latestGasSec = gasLatest[0]?.latest_timestamp || Math.floor(Date.now() / 1000);
+  const latestTimestampMs = Math.max(latestTxMs, latestGasSec * 1000); // Use latest from either table
 
-  // Generate 7-day range including endDate
+  const endDate = new Date(latestTimestampMs);
+  const startDate = new Date(endDate);
+  startDate.setDate(endDate.getDate() - 6); // 7-day range
+
+  // Generate 7-day range
   const dates = Array.from({ length: 7 }, (_, i) => {
     const date = new Date(startDate);
     date.setDate(startDate.getDate() + i);
@@ -53,20 +62,20 @@ export async function GET(request: NextRequest) {
   const txCountByDay = dates.map(date => ({ date, transactions: 0 }));
   const gasByDay = dates.map(date => ({ date, gas: '0.000' }));
 
-  // Query transactions
-  const query = `
+  // Transaction query (milliseconds)
+  const txQuery = `
     SELECT 
       TIMESTAMP_MILLIS(CAST(timestamp AS INT64)) AS timestamp,
       sender,
       receiver
-    FROM \`${projectId}.pyusd_data.transfer_logs\`
+    FROM \`${projectId}.pyusd_data.transfer_logs_\`
     WHERE 
       (sender = LOWER(@address) OR receiver = LOWER(@address))
       AND timestamp >= @startTime
       AND timestamp <= @endTime
   `;
-  const options = {
-    query,
+  const txOptions = {
+    query: txQuery,
     params: {
       address: address.toLowerCase(),
       startTime: startDate.getTime(),
@@ -74,20 +83,60 @@ export async function GET(request: NextRequest) {
     },
   };
 
-  const [rows] = await bigquery.query(options);
+  // Gas query (seconds)
+  const gasQuery = `
+  SELECT 
+    DATE(TIMESTAMP_SECONDS(block_timestamp)) AS tx_date,
+    SUM(gas_used * gas_price / 1e18) AS total_gas_eth
+  FROM \`${projectId}.pyusd_data.lp_activity_and_gas\`
+  WHERE 
+    block_timestamp BETWEEN @startTime AND @endTime
+    AND (
+      from_address = LOWER(@address)
+      OR to_address = LOWER(@address)
+      OR TO_JSON_STRING(args) LIKE CONCAT('%', LOWER(@address), '%')
+    )
+  GROUP BY tx_date
+`;
+const gasOptions = {
+  query: gasQuery,
+  params: {
+    address: address.toLowerCase(),
+    startTime: Math.floor(startDate.getTime() / 1000),
+    endTime: Math.floor(endDate.getTime() / 1000),
+  },
+};
 
-//   console.log('Dates:', dates);
-//   console.log('Rows:', rows);
+  const [txRows, gasRows] = await Promise.all([
+    bigquery.query(txOptions),
+    bigquery.query(gasOptions),
+  ]);
 
-  for (const row of rows) {
+  // Process transaction rows
+  for (const row of txRows[0]) {
     const txDate = new Date(row.timestamp.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const dayIndex = dates.indexOf(txDate);
-    console.log(`Row date: ${txDate}, Index: ${dayIndex}`);
     if (dayIndex !== -1) {
       txCountByDay[dayIndex].transactions++;
     }
   }
 
-//   console.log('Transaction Data:', txCountByDay);
+  // Process gas rows
+for (const row of gasRows[0]) {
+    const txDate = new Date(row.tx_date.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const dayIndex = dates.indexOf(txDate);
+    if (dayIndex !== -1) {
+      const gasEth = row.total_gas_eth || 0;
+      gasByDay[dayIndex].gas = gasEth.toFixed(3); // 3 decimals for ETH precision
+    }
+  }
+
+  // console.log('Start (ms):', startDate.getTime(), 'End (ms):', endDate.getTime());
+  // console.log('Start (s):', Math.floor(startDate.getTime() / 1000), 'End (s):', Math.floor(endDate.getTime() / 1000));
+  // console.log('Transaction Rows:', txRows[0]);
+  // console.log('Gas Rows:', gasRows[0]);
+  // console.log('Transaction Data:', txCountByDay);
+  // console.log('Gas Data:', gasByDay);
+
   return NextResponse.json({ transactionData: txCountByDay, gasData: gasByDay });
 }

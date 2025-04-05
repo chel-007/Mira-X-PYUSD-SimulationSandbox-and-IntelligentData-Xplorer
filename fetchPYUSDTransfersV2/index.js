@@ -11,13 +11,11 @@ const port = process.env.PORT || 8080;
 // Event topics
 const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 const CURVE_SWAP_TOPIC = '0x8b3e96f2b889fa771c53c981b40daf005f63f637f1869f707052d15a3dd97140';
-const UNISWAP_SWAP_TOPIC = '0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67';
 
 // Addresses (lowercase for consistency in comparisons)
 const PYUSD_ADDRESS = '0x6c3ea9036406852006290770bedfcaba0e23a0e8'.toLowerCase();
 const CURVE_POOL_1 = '0x383e6b4437b59fff47b619cba855ca29342a8559'.toLowerCase();
 const CURVE_POOL_2 = '0x625e92624bc2d88619accc1788365a69767f6200'.toLowerCase();
-const UNISWAP_POOL = '0xDd2e0D86A45e4EF9bd490c2809E6405720cC357c'.toLowerCase();
 
 // Cache for block timestamps to reduce RPC calls
 const blockTimestampCache = new Map();
@@ -38,7 +36,7 @@ async function fetchWithRetry(method, params, retries = 3, delay = 1000) {
   for (let i = 0; i < retries; i++) {
     try {
       const response = await fetch(
-        "https://blockchain.googleapis.com/v1/projects/mirax-beta/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=AIzaSyBHUjd0OL8Xj1HB-j12O_hxc8mdrOGRiRY",
+        "https://blockchain.googleapis.com/v1/projects/mirax-beta/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=apikey",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -50,18 +48,22 @@ async function fetchWithRetry(method, params, retries = 3, delay = 1000) {
           }),
         }
       );
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+      }
       const data = await response.json();
       if (data.error) {
         throw new Error(data.error.message);
       }
       return data.result;
     } catch (error) {
+      const attempt = i + 1;
       console.warn(`Retrying ${method} (attempt ${attempt}/${retries})... ${error.message}`);
       if (attempt === retries) {
         console.error(`Failed ${method} after ${retries} attempts: ${error.message}`);
-        return null; // Return null as last resort
+        return null;
       }
-      await new Promise(resolve => setTimeout(resolve, delay * attempt)); // Exponential backoff
+      await new Promise(resolve => setTimeout(resolve, delay * (attempt ** 2))); // Quadratic backoff
     }
   }
 }
@@ -153,18 +155,6 @@ async function processEvent(logData, eventType) {
       bought_id: parseInt(dataHex.slice(128, 192), 16).toString(),
       tokens_bought: BigInt('0x' + dataHex.slice(192, 256)).toString(),
     };
-  } else if (eventType === 'Swap' && address === UNISWAP_POOL) {
-    // Uniswap Swap event
-    const dataHex = logData.data.slice(2);
-    args = [
-      '0x' + logData.topics[1].slice(-40), // sender
-      '0x' + logData.topics[2].slice(-40), // to
-      BigInt('0x' + dataHex.slice(0, 64)).toString(), // amount0
-      BigInt('0x' + dataHex.slice(64, 128)).toString(), // amount1
-      BigInt('0x' + dataHex.slice(128, 192)).toString(), // sqrtPriceX96
-      BigInt('0x' + dataHex.slice(192, 256)).toString(), // liquidity
-      parseInt(dataHex.slice(256, 320), 16).toString(), // tick
-    ];
   }
 
   const eventData = {
@@ -270,22 +260,6 @@ function attachWebSocketHandlers(ws) {
         ],
       })
     );
-
-    // Subscribe to Uniswap Swap events
-    ws.send(
-      JSON.stringify({
-        jsonrpc: "2.0",
-        id: 3,
-        method: "eth_subscribe",
-        params: [
-          "logs",
-          {
-            address: UNISWAP_POOL,
-            topics: [UNISWAP_SWAP_TOPIC],
-          },
-        ],
-      })
-    );
   });
 
   ws.on("message", async (data) => {
@@ -346,17 +320,7 @@ function attachWebSocketHandlers(ws) {
           data: eventData,
         });
         console.log(`✅ Processed Curve Swap: ${txHash} | Pool: ${address}`);
-      } else if (eventSignature === UNISWAP_SWAP_TOPIC && address === UNISWAP_POOL) {
-        // Process Uniswap Swap event
-        const eventData = await processEvent(logData, 'Swap');
-        pendingWrites.push({
-          collection: lpCollection,
-          docId: `${txHash}-${logData.logIndex}`,
-          data: eventData,
-        });
-        console.log(`✅ Processed Uniswap Swap: ${txHash} | Pool: ${address}`);
       }
-
       // Schedule a batch write
       scheduleBatchWrite();
     } catch (error) {
@@ -386,7 +350,7 @@ function attachWebSocketHandlers(ws) {
 
 function startWebSocket() {
   console.log('🚀 Starting WebSocket connection...');
-  const ws = new WebSocket("wss://blockchain.googleapis.com/v1/projects/mirax-beta/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=AIzaSyBHUjd0OL8Xj1HB-j12O_hxc8mdrOGRiRY");
+  const ws = new WebSocket("wss://blockchain.googleapis.com/v1/projects/mirax-beta/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=apikey");
   attachWebSocketHandlers(ws);
 }
 

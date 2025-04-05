@@ -36,6 +36,9 @@ const TimeOfDayChart: React.FC<TimeOfDayChartProps> = ({ timeOfDayData }) => {
     tooltip.style.padding = "5px 10px";
     tooltip.style.borderRadius = "4px";
     tooltip.style.pointerEvents = "none";
+    tooltip.style.fontSize = "14px";
+    tooltip.style.fontFamily = "Josefin Sans, sans-serif";
+    tooltip.style.fontWeight = '200';
     tooltip.style.opacity = "0";
     tooltip.style.zIndex = "1000";
     document.body.appendChild(tooltip);
@@ -87,8 +90,8 @@ const TimeOfDayChart: React.FC<TimeOfDayChartProps> = ({ timeOfDayData }) => {
       });
     });
 
-    console.log("Complete data length:", completeData.length);
-    console.log("Sample data:", completeData.slice(0, 5));
+    // console.log("Complete data length:", completeData.length);
+    // console.log("Sample data:", completeData.slice(0, 5));
 
     // Compute congestion metric
     const maxGasFee = d3.max(completeData, d => d.avg_gas_fee_usd) || 1;
@@ -124,8 +127,8 @@ const TimeOfDayChart: React.FC<TimeOfDayChartProps> = ({ timeOfDayData }) => {
     const filteredDates = dates.filter((_, i) => i % tickInterval === 0);
 
     // Log bandwidths to debug
-    console.log("X bandwidth:", x.bandwidth());
-    console.log("Y bandwidth:", y.bandwidth());
+    // console.log("X bandwidth:", x.bandwidth());
+    // console.log("Y bandwidth:", y.bandwidth());
 
     // Color scale (logarithmic) for congestion
     const maxCongestion = d3.max(normalizedData, d => d.congestion) || 1;
@@ -272,8 +275,9 @@ const TimeOfDayChart: React.FC<TimeOfDayChartProps> = ({ timeOfDayData }) => {
         .attr("class", "y-axis-label")
         .attr("transform", "rotate(-90)")
         .attr("x", -innerHeight / 2)
-        .attr("y", -margin.left + 20)
+        .attr("y", -margin.left + 25)
         .attr("text-anchor", "middle")
+        .attr("font-size", "12px")
         .attr("fill", "#fff")
         .text("Date");
     } else {
@@ -352,8 +356,10 @@ const TimeOfDayChart: React.FC<TimeOfDayChartProps> = ({ timeOfDayData }) => {
       g.append("text")
         .attr("class", "legend-label")
         .attr("x", legendX + legendWidth / 2)
-        .attr("y", legendY - 10)
+        .attr("y", legendY - 30)
+        .attr("x", legendX + 20)
         .attr("text-anchor", "middle")
+        .attr("font-size", "12px")
         .attr("fill", "#fff")
         .text("Congestion");
     } else {

@@ -8,48 +8,45 @@ const StakingChart = ({ stakingData, address }) => {
   const contractAddresses = {
     'Curve PYUSD/USDC': '0x383E6b4437b59fff47B619CBA855CA29342A8559',
     'Curve PYUSD/crvUSD': '0x625E92624Bc2D88619ACCc1788365A69767f6200',
-    'Uniswap': '0xDd2e0D86A45e4EF9bd490c2809E6405720cC357c',
+    'Uniswap PYUSD/USDT': '0xDd2e0D86A45e4EF9bd490c2809E6405720cC357c',
   };
 
   useEffect(() => {
-    if (!chartRef.current) return;
+    if (!chartRef.current || !stakingData.length) return;
 
-    // Clear any existing content
+    // Clear existing content
     d3.select(chartRef.current).selectAll('*').remove();
 
-    // Filter pools with non-zero stake
-    const activePools = stakingData.filter(d => d.stakeAmount > 0);
+    // Use all pools, not just active ones
+    const activePools = stakingData; // No filtering for stakeAmount > 0
 
     const width = chartRef.current.clientWidth || 800;
-    const height = 380; // Increase height to accommodate labels
+    const height = 380;
     const centerX = width / 2;
-    const centerY = height / 2; // Center vertically without extra offset
+    const centerY = height / 2;
 
     const svg = d3.select(chartRef.current)
-    .append('svg')
-    .attr('width', width)
-    .attr('height', height)
-    // .style('background', '#fff');
+      .append('svg')
+      .attr('width', width)
+      .attr('height', height);
 
     // Define gradients and filters
     const defs = svg.append('defs');
 
     // Pool gradients
     activePools.forEach((d, i) => {
-      
-    const gradientId = d.pool.replace(/[^a-zA-Z0-9]/g, '-'); // Replace non-alphanumeric with '-'
-
-    const gradient = defs.append('linearGradient')
+      const gradientId = d.pool.replace(/[^a-zA-Z0-9]/g, '-');
+      const gradient = defs.append('linearGradient')
         .attr('id', `${gradientId}Gradient`)
         .attr('x1', '0%')
         .attr('y1', '0%')
         .attr('x2', '100%')
         .attr('y2', '100%');
-    gradient.append('stop')
+      gradient.append('stop')
         .attr('offset', '10%')
         .attr('stop-color', i === 0 ? 'rgba(43, 139, 234, 0.08)' : i === 1 ? 'rgba(167, 218, 255, 0.08)' : 'rgba(0, 124, 12, 0.08)')
         .attr('stop-opacity', 0.4);
-    gradient.append('stop')
+      gradient.append('stop')
         .attr('offset', '90%')
         .attr('stop-color', i === 0 ? 'rgb(39, 146, 252)' : i === 1 ? '#818499' : 'rgb(0, 124, 12)')
         .attr('stop-opacity', 0.8);

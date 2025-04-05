@@ -14,10 +14,10 @@ interface PoolMetricsData {
 }
 
 interface PoolMetricsChartProps {
-  data: PoolMetricsData[];
+  poolMetricsData: PoolMetricsData[];
 }
 
-const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ data }) => {
+const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ poolMetricsData }) => {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
@@ -51,11 +51,11 @@ const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ data }) => {
       console.log("Animation in progress, skipping render");
       return;
     }
-    if (!svgRef.current || !containerRef.current || !data.length) {
+    if (!svgRef.current || !containerRef.current || !poolMetricsData.length) {
       console.log("Chart not rendering due to missing SVG, container, or data:", {
         svg: !!svgRef.current,
         container: !!containerRef.current,
-        dataLength: data.length,
+        dataLength: poolMetricsData.length,
       });
       return;
     }
@@ -73,9 +73,9 @@ const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ data }) => {
     const metrics = ["median_gas_fee_eth", "total_volume_usd", "tvl_usd", "apr"];
     const color = d3.scaleOrdinal()
       .domain(metrics)
-      .range(["#FF9F1C", "#2AB7CA", "#FED766", "#E71D36"]);
+      .range(["#FF9F1C", "#1E90FF", "#FED766", "#E71D36"]);
 
-    const normalizedData = data.map(d => {
+    const normalizedData = poolMetricsData.map(d => {
       const result: any = { ...d, original: {} };
       metrics.forEach(metric => {
         result.original[metric] = d[metric] || 0;
@@ -85,7 +85,7 @@ const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ data }) => {
 
     const scales: { [key: string]: d3.ScaleLogarithmic<number, number> } = {};
     ["median_gas_fee_eth", "apr"].forEach(metric => {
-      const values = data.map(d => d[metric] || 0);
+      const values = poolMetricsData.map(d => d[metric] || 0);
       const minValue = Math.max(d3.min(values)!, 0.0001);
       const maxValue = d3.max(values)! * 1.1;
       scales[metric] = d3.scaleLog()
@@ -103,7 +103,7 @@ const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ data }) => {
     });
 
     const x0 = d3.scaleBand()
-      .domain(data.map(d => d.pool_address))
+      .domain(poolMetricsData.map(d => d.pool_address))
       .range([0, innerWidth])
       .padding(0.2);
 
@@ -112,8 +112,8 @@ const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ data }) => {
       .range([0, x0.bandwidth()])
       .padding(0.1);
 
-    const maxValue = d3.max(data, d => Math.max(d.total_volume_usd, d.tvl_usd || 0))! * 1.1;
-    const minValue = d3.min(data, d => Math.min(d.total_volume_usd, d.tvl_usd || 0))! || 0.0001;
+    const maxValue = d3.max(poolMetricsData, d => Math.max(d.total_volume_usd, d.tvl_usd || 0))! * 1.1;
+    const minValue = d3.min(poolMetricsData, d => Math.min(d.total_volume_usd, d.tvl_usd || 0))! || 0.0001;
     const yLog = d3.scaleLog()
       .domain([minValue, maxValue])
       .range([innerHeight, 0])
@@ -335,7 +335,7 @@ const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ data }) => {
       if (containerRef.current && svgRef.current) {
         const width = containerRef.current.clientWidth || 600;
         const height = containerRef.current.clientHeight || 400;
-        if (data.length) renderChart(width, height);
+        if (poolMetricsData.length) renderChart(width, height);
       }
     };
 
@@ -354,7 +354,7 @@ const PoolMetricsChart: React.FC<PoolMetricsChartProps> = ({ data }) => {
       if (containerRef.current) resizeObserver.unobserve(containerRef.current);
       if (resizeTimeout) clearTimeout(resizeTimeout);
     };
-  }, [data]);
+  }, [poolMetricsData]);
 
   useEffect(() => {
     return () => {

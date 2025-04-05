@@ -82,7 +82,7 @@ const ChartReports = ({ view, transactionData, gasData }) => {
     const svg = d3.select(chartRef.current)
       .append('svg')
       .attr('width', '100%')
-      .attr('height', 300) // Increased height to 300px
+      .attr('height', '100%') // Increased height to 300px
       .style('display', 'block');
 
     const width = chartRef.current.clientWidth;

@@ -127,6 +127,7 @@ const Explore = () => {
                 >
                   <WalletGrowthChart
                   walletGrowthData={walletGrowthData}
+                  key={walletGrowthData.length}
                   onZoom={() => console.log("Zoom passed to SwapVolumeChart")}
                   onPan={() => console.log("Pan passed to SwapVolumeChart")}
                   onDownload={() => console.log("Download passed to SwapVolumeChart")}
@@ -163,15 +164,9 @@ const Explore = () => {
                 loading={loading}
                 showExtraControls={true}
                 showChartControls={true}
-              onZoom={() => console.log("Zoom clicked")} // Temporary for testing
-              onPan={() => console.log("Pan clicked")}
-              onDownload={() => console.log("Download clicked")}
             >
               <SwapVolumeChart
-                data={swapVolumeData}
-                onZoom={() => console.log("Zoom passed to SwapVolumeChart")}
-                onPan={() => console.log("Pan passed to SwapVolumeChart")}
-                onDownload={() => console.log("Download passed to SwapVolumeChart")}
+                swapVolumeData={swapVolumeData}
               />
               </ChartWrapper>
               <ChartWrapper
@@ -180,7 +175,7 @@ const Explore = () => {
                 showExtraControls={true}
                 showChartControls={true}
               >
-                <PoolMetricsChart data={poolMetricsData} />
+                <PoolMetricsChart poolMetricsData={poolMetricsData} />
               </ChartWrapper>
             </>
           )}
