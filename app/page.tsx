@@ -51,7 +51,7 @@ export default function Home() {
 
           <div className={styles.feature}>
             <div className={styles.largeText}>Connect</div>
-            <div className={styles.subtext}>block rpc api on gcp infrastructure</div>
+            <div className={styles.subtext}>data api on gcp infrastructure</div>
             <button className={`${styles.featureButton} ${styles.battle}`}>
               For Builders <i className="fa-solid fa-bolt"></i>
             </button>

@@ -1,127 +1,95 @@
-   // Uniswap V3 PYUSD/USDT
-    // const UNISWAP_POSITION_MANAGER = '0xC36442b4a4522E871399CD717aBDD847Ab11FE88';
-    // const UNISWAP_PYUSD_USDT_POOL = '0xDd2e0D86A45e4EF9bd490c2809E6405720cC357c';
+    // Uniswap PYUSD/USDT
+    const UNISWAP_POOL_ADDRESS = '0xDd2e0D86A45e4EF9bd490c2809E6405720cC357c'; // Corrected from your earlier code
+    const PYUSD_ADDRESS = '0x6c3ea9036406852006290770bedfcaba0e23a0e8';
+    const USDT_ADDRESS = '0xdac17f958d2ee523a2206206994597c13d831ec7';
+    const FEE = 500;
   
-    // // Fetch pool state (sqrtPriceX96 and tick)
-    // const slot0Data = {
-    //   jsonrpc: '2.0',
-    //   id: 6,
-    //   method: 'eth_call',
-    //   params: [
-    //     {
-    //       to: UNISWAP_PYUSD_USDT_POOL,
-    //       data: '0x3850c7bd', // slot0 function
-    //     },
-    //     'latest',
-    //   ],
-    // };
-    // const slot0Response = await fetch(RPC_URL, {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify(slot0Data),
-    // });
-    // const slot0Result = await slot0Response.json();
-    // const sqrtPriceX96 = slot0Result.result ? BigInt(`0x${slot0Result.result.slice(2, 66)}`) : BigInt(0);
-    // const tick = slot0Result.result ? parseInt(slot0Result.result.slice(66, 130), 16) : 0;
+    let totalStake = 0;
+    let uniswapApy = 0;
+    let uniswapTvl = 0;
   
-    // Fetch user's position count
-    // const uniswapBalanceOf = {
-    //   jsonrpc: '2.0',
-    //   id: 7,
-    //   method: 'eth_call',
-    //   params: [
-    //     {
-    //       to: UNISWAP_POSITION_MANAGER,
-    //       data: `0x70a08231${address.slice(2).padStart(64, '0')}`,
-    //     },
-    //     'latest',
-    //   ],
-    // };
-    // const uniswapBalanceResponse = await fetch(RPC_URL, {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify(uniswapBalanceOf),
-    // });
-    // const uniswapBalanceResult = await uniswapBalanceResponse.json();
-    // const positionCount = uniswapBalanceResult.result ? parseInt(uniswapBalanceResult.result, 16) : 0;
+    try {
+      // Fetch slot0
+      const slot0Data = {
+        jsonrpc: '2.0',
+        id: 4,
+        method: 'eth_call',
+        params: [{ to: UNISWAP_POOL_ADDRESS, data: '0x3850c7bd' }, 'latest'],
+      };
+      const slot0Response = await fetch(RPC_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(slot0Data),
+      });
+      const slot0Result = await slot0Response.json();
+      const slot0Hex = slot0Result.result || '0x0';
+      const sqrtPriceX96 = BigInt('0x' + slot0Hex.slice(2, 66));
+      const tick = BigInt.asIntN(24, BigInt('0x' + slot0Hex.slice(66, 130)));
   
-    // let uniswapStake = 0;
-    // for (let i = 0; i < positionCount; i++) {
-    //   const tokenIdData = {
-    //     jsonrpc: '2.0',
-    //     id: 8 + i,
-    //     method: 'eth_call',
-    //     params: [
-    //       {
-    //         to: UNISWAP_POSITION_MANAGER,
-    //         data: `0x6352211e${address.slice(2).padStart(64, '0')}${i.toString(16).padStart(64, '0')}`,
-    //       },
-    //       'latest',
-    //     ],
-    //   };
-    //   const tokenIdResponse = await fetch(RPC_URL, {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify(tokenIdData),
-    //   });
-    //   const tokenIdResult = await tokenIdResponse.json();
-    //   const tokenId = tokenIdResult.result ? parseInt(tokenIdResult.result, 16) : null;
+      // Fetch positions
+      let positions = [];
+      try {
+        const response = await fetch('/api/stakingData', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            owner: effectiveAddress.toLowerCase(),
+            pool: UNISWAP_POOL_ADDRESS.toLowerCase(),
+          }),
+        });
+        if (!response.ok) throw new Error(`API returned ${response.status}`);
+        const data = await response.json();
+        positions = data.positions || [];
+        console.log('Uniswap positions:', positions);
+      } catch (error) {
+        console.error('Error fetching Uniswap positions:', error);
+      }
   
-    //   if (tokenId) {
-    //     const positionData = {
-    //       jsonrpc: '2.0',
-    //       id: 100 + i,
-    //       method: 'eth_call',
-    //       params: [
-    //         {
-    //           to: UNISWAP_POSITION_MANAGER,
-    //           data: `0x99fbab88${tokenId.toString(16).padStart(64, '0')}`,
-    //         },
-    //         'latest',
-    //       ],
-    //     };
-    //     const positionResponse = await fetch(RPC_URL, {
-    //       method: 'POST',
-    //       headers: { 'Content-Type': 'application/json' },
-    //       body: JSON.stringify(positionData),
-    //     });
-    //     const positionResult = await positionResponse.json();
-    //     const position = positionResult.result;
-    //     if (position) {
-    //       const token0 = `0x${position.slice(26, 66)}`.toLowerCase();
-    //       const token1 = `0x${position.slice(90, 130)}`.toLowerCase();
-    //       const liquidity = BigInt(`0x${position.slice(258, 322)}`);
-    //       const tickLower = parseInt(position.slice(322, 386), 16);
-    //       const tickUpper = parseInt(position.slice(386, 450), 16);
+      // Calculate stake
+      const token0 = new Token(1, PYUSD_ADDRESS, 6, 'PYUSD', 'PayPal USD');
+      const token1 = new Token(1, USDT_ADDRESS, 6, 'USDT', 'Tether USD');
+      const pool = new Pool(token0, token1, FEE, sqrtPriceX96.toString(), 0, Number(tick));
+      for (const pos of positions) {
+        const position = new Position({
+          pool,
+          liquidity: pos.liquidity,
+          tickLower: pos.tickLower.tickIdx,
+          tickUpper: pos.tickUpper.tickIdx,
+        });
+        const amount0 = parseFloat(position.amount0.toSignificant(6));
+        const amount1 = parseFloat(position.amount1.toSignificant(6));
+        totalStake += amount0 + amount1;
+      }
+    } catch (error) {
+      console.error('Error calculating Uniswap stake:', error);
+      totalStake = 0;
+    }
   
-    //       if (token0 === PYUSD_ADDRESS || token1 === PYUSD_ADDRESS) {
-    //         // Simplified in-range calculation (assumes position is fully in-range)
-    //         if (tickLower <= tick && tick <= tickUpper) {
-    //           const sqrtPriceLower = BigInt(Math.sqrt(1.0001 ** tickLower) * 2 ** 96);
-    //           const sqrtPriceUpper = BigInt(Math.sqrt(1.0001 ** tickUpper) * 2 ** 96);
-    //           let amount0 = 0n;
-    //           let amount1 = 0n;
+    // Fetch APY and TVL from DefiLlama
+    try {
+      const defiLlamaResponse = await fetch('https://yields.llama.fi/pools');
+      const defiLlamaData = await defiLlamaResponse.json();
+      const uniswapPoolData = defiLlamaData.data.find(
+        (pool) => pool.pool.toLowerCase() === UNISWAP_POOL_ADDRESS.toLowerCase() && pool.chain === 'Ethereum'
+      );
+      if (uniswapPoolData) {
+        uniswapApy = uniswapPoolData.apy;
+        uniswapTvl = uniswapPoolData.tvlUsd;
+      } else {
+        console.warn('Uniswap pool not found in DefiLlama API, using fallback values');
+        uniswapApy = 0; // Fallback APY
+        uniswapTvl = 0; // Fallback TVL
+      }
+    } catch (error) {
+      console.error('Error fetching DefiLlama API:', error);
+      uniswapApy = 0;
+      uniswapTvl = 0;
+    }
   
-    //           if (sqrtPriceX96 < sqrtPriceLower) {
-    //             amount0 = liquidity * (sqrtPriceUpper - sqrtPriceLower) / (sqrtPriceLower * sqrtPriceUpper);
-    //           } else if (sqrtPriceX96 > sqrtPriceUpper) {
-    //             amount1 = liquidity * (sqrtPriceUpper - sqrtPriceLower);
-    //           } else {
-    //             amount0 = liquidity * (sqrtPriceUpper - sqrtPriceX96) / (sqrtPriceX96 * sqrtPriceUpper);
-    //             amount1 = liquidity * (sqrtPriceX96 - sqrtPriceLower);
-    //           }
-  
-    //           const pyusdAmount = token0 === PYUSD_ADDRESS ? amount0 : amount1;
-    //           uniswapStake += Number(pyusdAmount) / 1e18; // Assuming 18 decimals for PYUSD
-    //         }
-    //       }
-    //     }
-    //   }
-    // }
-  
-    // stakingData.push({
-    //   pool: 'Uniswap',
-    //   stakeAmount: uniswapStake,
-    //   apy: 25, // Replace with actual API call if available
-    //   tvl: 65199, // Replace with actual API call if available
-    // });
+    // Always push Uniswap pool, even with zero stake
+    newStakingData.push({
+      pool: 'Uniswap PYUSD/USDT',
+      stakeAmount: totalStake,
+      apy: uniswapApy,
+      tvl: uniswapTvl,
+    });

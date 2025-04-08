@@ -4,36 +4,29 @@ import * as d3 from 'd3';
 
 const StakingChart = ({ stakingData, address }) => {
   const chartRef = useRef(null);
+  const svgRef = useRef(null);
 
   const contractAddresses = {
     'Curve PYUSD/USDC': '0x383E6b4437b59fff47B619CBA855CA29342A8559',
     'Curve PYUSD/crvUSD': '0x625E92624Bc2D88619ACCc1788365A69767f6200',
-    'Uniswap PYUSD/USDT': '0xDd2e0D86A45e4EF9bd490c2809E6405720cC357c',
   };
 
-  useEffect(() => {
+  const drawChart = (width, height) => {
     if (!chartRef.current || !stakingData.length) return;
 
-    // Clear existing content
-    d3.select(chartRef.current).selectAll('*').remove();
+    const svg = d3.select(svgRef.current);
+    svg.selectAll('*').remove();
 
-    // Use all pools, not just active ones
-    const activePools = stakingData; // No filtering for stakeAmount > 0
-
-    const width = chartRef.current.clientWidth || 800;
-    const height = 380;
+    const activePools = stakingData;
     const centerX = width / 2;
     const centerY = height / 2;
-
-    const svg = d3.select(chartRef.current)
-      .append('svg')
-      .attr('width', width)
-      .attr('height', height);
+    const baseRadius = Math.min(width, height) / 2;
+    const radiusInnest = baseRadius * 0.25;
+    const radiusInner = baseRadius * 0.6;
+    const radiusOuter = baseRadius;
 
     // Define gradients and filters
     const defs = svg.append('defs');
-
-    // Pool gradients
     activePools.forEach((d, i) => {
       const gradientId = d.pool.replace(/[^a-zA-Z0-9]/g, '-');
       const gradient = defs.append('linearGradient')
@@ -52,7 +45,6 @@ const StakingChart = ({ stakingData, address }) => {
         .attr('stop-opacity', 0.8);
     });
 
-    // Glow filter for PYUSD icon
     const glowFilter = defs.append('filter')
       .attr('id', 'glow')
       .attr('x', '-50%')
@@ -66,17 +58,12 @@ const StakingChart = ({ stakingData, address }) => {
       .attr('type', 'matrix')
       .attr('values', '0 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0');
 
-    // Calculate total stake for percentages
     const totalStake = d3.sum(activePools, d => d.stakeAmount) || 1;
-    const radiusInnest = 40;
-    const radiusInner = 100;
-    const radiusOuter = 160;
 
-    // Create arc group centered in SVG
     const arcGroup = svg.append('g')
       .attr('transform', `translate(${centerX}, ${centerY})`);
 
-    // Draw concentric circles
+    // Concentric circles
     arcGroup.append('circle')
       .attr('r', radiusInnest)
       .attr('fill', 'none')
@@ -95,52 +82,52 @@ const StakingChart = ({ stakingData, address }) => {
       .attr('stroke', '#818499')
       .attr('stroke-width', 1);
 
-    // Add PYUSD icon in the inner circle
+    // PYUSD icon
+    const iconSize = radiusInnest * 1.2;
     arcGroup.append('image')
       .attr('xlink:href', '/pyusd-icon.svg')
-      .attr('x', -25)
-      .attr('y', -25)
-      .attr('width', 50)
-      .attr('height', 50)
+      .attr('x', -iconSize / 2)
+      .attr('y', -iconSize / 2)
+      .attr('width', iconSize)
+      .attr('height', iconSize)
       .attr('filter', 'url(#glow)');
 
-// Create percentage-based arcs and text labels
-let startAngle = 0;
-const offset = 20; // Adjust this value to position labels further or closer
-activePools.forEach((d, i) => {
-  const gradientId = d.pool.replace(/[^a-zA-Z0-9]/g, '-');
-  const stakePercentage = d.stakeAmount / totalStake;
-  const endAngle = startAngle + (stakePercentage * 2 * Math.PI);
+    // Percentage arcs and labels
+    let startAngle = 0;
+    const offset = baseRadius * 0.15;
+    activePools.forEach((d) => {
+      const gradientId = d.pool.replace(/[^a-zA-Z0-9]/g, '-');
+      const stakePercentage = d.stakeAmount / totalStake;
+      const endAngle = startAngle + (stakePercentage * 2 * Math.PI);
 
-  const arc = d3.arc()
-    .innerRadius(radiusInnest)
-    .outerRadius(radiusOuter)
-    .startAngle(startAngle)
-    .endAngle(endAngle);
+      const arc = d3.arc()
+        .innerRadius(radiusInnest)
+        .outerRadius(radiusOuter)
+        .startAngle(startAngle)
+        .endAngle(endAngle);
 
-    arcGroup.append('path')
-    .attr('d', arc)
-    .attr('fill', `url(#${gradientId}Gradient)`);
+      arcGroup.append('path')
+        .attr('d', arc)
+        .attr('fill', `url(#${gradientId}Gradient)`);
 
-  // Add text label at the midpoint of the arc, slightly outside the outer circle
-    const midAngle = (startAngle + endAngle) / 2;
-    const labelRadius = radiusOuter + offset;
-    const labelX = labelRadius * Math.sin(midAngle);
-    const labelY = -labelRadius * Math.cos(midAngle);
+      const midAngle = (startAngle + endAngle) / 2;
+      const labelRadius = radiusOuter + offset;
+      const labelX = labelRadius * Math.sin(midAngle);
+      const labelY = -labelRadius * Math.cos(midAngle);
 
-    arcGroup.append('text')
+      arcGroup.append('text')
         .attr('x', labelX)
         .attr('y', labelY)
         .attr('text-anchor', 'middle')
         .attr('fill', '#fff')
-        .attr('font-size', '12px')
+        .attr('font-size', Math.min(12, baseRadius * 0.06))
         .text(d.pool);
 
-    startAngle = endAngle;
+      startAngle = endAngle;
     });
 
-    // Single sweep effect
-    const maxRadius = radiusOuter + 10;
+    // Sweep effect
+    const maxRadius = radiusOuter + baseRadius * 0.06;
     const sweepArc = d3.arc()
       .innerRadius(0)
       .outerRadius(maxRadius);
@@ -171,12 +158,13 @@ activePools.forEach((d, i) => {
       });
 
     // Legend
+    const legendX = width > 600 ? centerX + baseRadius * 1.6 : 20;
     const legend = svg.append('g')
-      .attr('transform', `translate(${centerX + 200}, 100)`);
+      .attr('transform', `translate(${legendX}, ${height > 300 ? 100 : 20})`);
 
     stakingData.forEach((d, i) => {
       const gradientId = d.pool.replace(/[^a-zA-Z0-9]/g, '-');
-      const yOffset = i * 60;
+      const yOffset = i * (height > 300 ? 80 : 40);
       legend.append('rect')
         .attr('x', 0)
         .attr('y', yOffset)
@@ -188,99 +176,117 @@ activePools.forEach((d, i) => {
         .attr('x', 20)
         .attr('y', yOffset + 10)
         .attr('fill', '#fff')
-        .attr('font-size', '12px')
+        .attr('font-size', Math.min(12, baseRadius * 0.06))
         .text(`${d.pool}`);
 
       legend.append('text')
         .attr('x', 20)
         .attr('y', yOffset + 30)
         .attr('fill', '#ccc')
-        .attr('font-size', '14px')
+        .attr('font-size', Math.min(14, baseRadius * 0.07))
         .text(`Stake: ${d.stakeAmount} PYUSD`);
 
       legend.append('text')
         .attr('x', 20)
-        .attr('y', yOffset + 45)
+        .attr('y', yOffset + 50)
         .attr('fill', '#ccc')
-        .attr('font-size', '11px')
+        .attr('font-size', Math.min(18, baseRadius * 0.06))
         .text(`APY: ${d.apy}% | TVL: $${d.tvl.toLocaleString()}`);
     });
 
-    // APY and TVL explanation on the left side
-    const infoGroup = svg.append('g')
-    .attr('transform', `translate(${centerX - 380}, 110)`);
+    // Info group
+// Info group
+const infoX = width > 600 ? centerX - baseRadius * 2.5 : 20;
+const infoGroup = svg.append('g')
+  .attr('transform', `translate(${infoX}, ${Math.max(20, baseRadius * 0.65)})`); // Dynamic top padding
 
-    // Tooltip div (attached to chart container)
-    const chartContainer = d3.select(chartRef.current);
-    const tooltip = chartContainer.append('div')
-    .style('position', 'absolute')
-    .style('visibility', 'hidden')
-    .style('background', 'rgba(129, 132, 153, 0.25)')
-    .style('padding', '3px 8px')
-    .style('border-radius', '8px')
-    .style('font-size', '10px')
-    .style('color', '#9196b0')
-    .style('pointer-events', 'none'); // Changed from 'cursor' to 'none' to prevent tooltip interaction
+// Tooltip (append directly, no .data().enter())
+const tooltip = d3.select(chartRef.current)
+  .append('div')
+  .attr('class', 'staking-tooltip')
+  .style('position', 'absolute')
+  .style('visibility', 'hidden')
+  .style('background', 'rgba(129, 132, 153, 0.25)')
+  .style('padding', '3px 8px')
+  .style('border-radius', '8px')
+  .style('font-size', '10px')
+  .style('color', '#9196b0')
+  .style('pointer-events', 'none');
 
-    // Programmatic Contract Address info
-    stakingData.forEach((d, i) => {
-    const infoItem = infoGroup.append('g')
-        .attr('class', 'info-item')
-        .attr('transform', `translate(0, ${i * 40})`);
+stakingData.forEach((d, i) => {
+  const spacing = Math.max(30, baseRadius * 0.2); // Minimum 30px, scales with radius
+  const infoItem = infoGroup.append('g')
+    .attr('transform', `translate(0, ${i * spacing})`);
 
-    // Circle for the "i"
-    const infoCircle = infoItem.append('circle')
-        .attr('cx', 0)
-        .attr('cy', 0)
-        .attr('r', 8)
-        .attr('fill', 'none')
-        .attr('stroke', '#818499')
-        .attr('stroke-width', 1);
+  infoItem.append('circle')
+    .attr('cx', 0)
+    .attr('cy', 0)
+    .attr('r', Math.min(8, baseRadius * 0.04))
+    .attr('fill', 'none')
+    .attr('stroke', '#818499')
+    .attr('stroke-width', 1);
 
-    // "i" text inside the circle
-    const infoIcon = infoItem.append('text')
-        .attr('x', 0)
-        .attr('y', 4)
-        .attr('text-anchor', 'middle')
-        .attr('fill', '#fff')
-        .attr('font-size', '12px')
-        .text('i');
+  infoItem.append('text')
+    .attr('x', 0)
+    .attr('y', 4)
+    .attr('text-anchor', 'middle')
+    .attr('fill', '#fff')
+    .attr('font-size', Math.min(14, baseRadius * 0.06))
+    .text('i');
 
-    // Pool contract text
-    infoItem.append('text')
-        .attr('x', 20)
-        .attr('y', 4)
-        .attr('fill', '#fff')
-        .attr('font-size', '12px')
-        .text(`${d.pool}`);
+  infoItem.append('text')
+    .attr('x', 20)
+    .attr('y', 4)
+    .attr('fill', '#fff')
+    .attr('font-size', Math.min(14, baseRadius * 0.06))
+    .text(`${d.pool}`);
 
-    // Add hover behavior only to the circle and "i" text
-    const hoverGroup = infoItem.append('g')
-        .style('cursor', 'pointer'); // Hand cursor on hover
+  const hoverGroup = infoItem.append('g')
+    .style('cursor', 'pointer');
 
-    // Add invisible circle for better hover area
-    hoverGroup.append('circle')
-        .attr('cx', 0)
-        .attr('cy', 0)
-        .attr('r', 10) // Slightly larger than the visible circle for better hover area
-        .attr('fill', 'transparent');
+  hoverGroup.append('circle')
+    .attr('cx', 0)
+    .attr('cy', 0)
+    .attr('r', Math.min(10, baseRadius * 0.05))
+    .attr('fill', 'transparent');
 
-    hoverGroup.on('mouseover', (event) => {
-        const contractAddress = contractAddresses[d.pool] || 'Not available';
-        // const bbox = infoItem.node().getBBox(); 
-        // const svgPoint = svg.node().createSVGPoint();
-        // svgPoint.x = bbox.x;
-        // svgPoint.y = bbox.y;
-        // const coords = svgPoint.matrixTransform(svg.node().getScreenCTM());
+  hoverGroup.on('mouseover', (event) => {
+    const contractAddress = contractAddresses[d.pool] || 'Not available';
+    tooltip.style('visibility', 'visible')
+      .text(`Contract Address: ${contractAddress}`)
+      .style('left', `${event.layerX + 10}px`)
+      .style('top', `${event.layerY - 25}px`);
+  })
+  .on('mouseout', () => tooltip.style('visibility', 'hidden'));
+});
+  };
 
-        tooltip.style('visibility', 'visible')
-        .text(`Contract Address: ${contractAddress}`)
-        .style('left', `${event.layerX + 10}px`) // Position to the right of the text
-        .style('top', `${event.layerY - 25}px`); // Position above the text
-    })
-    .on('mouseout', () => tooltip.style('visibility', 'hidden'));
-    });
+  useEffect(() => {
+    if (!chartRef.current) return;
 
+    d3.select(chartRef.current).selectAll('*').remove();
+    const svg = d3.select(chartRef.current)
+      .append('svg')
+      .attr('width', '100%')
+      .attr('height', '100%')
+      .style('display', 'block');
+    svgRef.current = svg.node();
+
+    const resizeChart = () => {
+      const width = chartRef.current.clientWidth;
+      const height = chartRef.current.clientHeight;
+      svg.attr('width', width).attr('height', height);
+      drawChart(width, height);
+    };
+
+    resizeChart();
+    const observer = new ResizeObserver(() => resizeChart());
+    observer.observe(chartRef.current);
+
+    return () => {
+      observer.disconnect();
+      d3.select(chartRef.current).select('.staking-tooltip').remove();
+    };
   }, [stakingData, address]);
 
   return (
@@ -288,11 +294,12 @@ activePools.forEach((d, i) => {
       ref={chartRef}
       style={{
         width: '100%',
-        height: '300px',
+        minHeight: '350px',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        position: 'relative', // Contain tooltips within this div
+        position: 'relative',
+        overflow: 'hidden',
       }}
     />
   );

@@ -497,7 +497,7 @@ setMaxTxPerHour(500); // Adjust as needed
         setLoading(false);
       },
       (error) => {
-        console.error("Firestore error (transfer_transactions):", error);
+        // console.error("Firestore error:", error);
         toast.error(`Unstable Internet. Please refresh the app ${error}`, {
           position: 'top-right',
           autoClose: 5000,
@@ -520,7 +520,7 @@ setMaxTxPerHour(500); // Adjust as needed
     };
 
       } catch (error) {
-        console.error("Error loading historical data:", error);
+        // console.error("Error loading historical data:", error);
         toast.error(`Please refresh the app! ${error}`, {
           position: 'top-right',
           autoClose: 5000,
@@ -695,7 +695,7 @@ setMaxTxPerHour(500); // Adjust as needed
             const gasFeeEth = (gasPrice * gasUsed) / 1e18;
         
             if (isNaN(gasPrice) || isNaN(gasUsed) || isNaN(gasFeeEth)) {
-              console.warn(`Skipping invalid gas data for ${eventType} on ${date}`, { gasPrice, gasUsed });
+              // console.warn(`Skipping invalid gas data for ${eventType} on ${date}`, { gasPrice, gasUsed });
               return acc;
             }
         
@@ -765,21 +765,20 @@ setMaxTxPerHour(500); // Adjust as needed
 
         // Update Time of Day Chart (real-time)
 
-        // Step 1: Process real-time time-of-day from Firestore (today only)
         const realTimeTimeOfDay = normalizedEvents
           .filter(e => {
             const eventDate = new Date(e.block_timestamp).toISOString().split("T")[0];
-            return eventDate === today; // Only today’s transactions
+            return eventDate === today; 
           })
           .reduce((acc: Record<string, { totalGasEth: number; totalGasUsd: number; count: number }>, event) => {
-            // Ensure valid gas data
+
             const gasPrice = Number(event.gas_price);
             const gasUsed = Number(event.gas_used);
             const gasFeeEth = (gasPrice * gasUsed) / 1e18;
         
             if (isNaN(gasPrice) || isNaN(gasUsed) || isNaN(gasFeeEth)) {
-              console.warn(`Skipping invalid gas data for event at ${event.block_timestamp}`, { gasPrice, gasUsed });
-              return acc; // Skip NaN entries
+              // console.warn(`Skipping invalid gas data for event at ${event.block_timestamp}`, { gasPrice, gasUsed });
+              return acc;
             }
         
             const date = new Date(event.block_timestamp);
@@ -853,9 +852,8 @@ setMaxTxPerHour(500); // Adjust as needed
           };
         });
         
-        // Step 3: Set both states
-        console.log("realtimeofday", realTimeTimeOfDayData);
-        console.log("combinedtimeofday", timeOfDayData);
+        // console.log("realtimeofday", realTimeTimeOfDayData);
+        // console.log("combinedtimeofday", timeOfDayData);
         setRealTimeTimeOfDay(realTimeTimeOfDayData);
         setTimeOfDay(timeOfDayData);
 
@@ -878,12 +876,7 @@ setMaxTxPerHour(500); // Adjust as needed
           // });
       
           if (event.event_type === "Swap") {
-            if (poolAddress === UNISWAP_POOL) {
-              const amount0 = Number(event.args[2]) / 1_000_000; // USDT
-              const amount1 = Number(event.args[3]) / 1_000_000; // PYUSD
-              volumeUsd = Math.max(Math.abs(amount0), Math.abs(amount1));
-              console.log(`Uniswap Swap: amount0=${amount0}, amount1=${amount1}, volumeUsd=${volumeUsd}`);
-            } else if (poolAddress === CURVE_POOL_PYUSD_CRVUSD) {
+            if (poolAddress === CURVE_POOL_PYUSD_CRVUSD) {
               const soldId = parseInt(event.args.sold_id);
               const boughtId = parseInt(event.args.bought_id);
               const tokensSoldDecimals = soldId === 0 ? 1_000_000 : 1_000_000_000_000_000_000;
@@ -1271,9 +1264,8 @@ setMaxTxPerHour(500); // Adjust as needed
     realTimeLoading,
   };
 
-  return <DataContext.Provider value={value}>
+  return <DataContext.Provider value={value}> 
     {children}
-    <ToastContainer />
   </DataContext.Provider>;
 };
 

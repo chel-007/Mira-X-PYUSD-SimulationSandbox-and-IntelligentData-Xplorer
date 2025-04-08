@@ -296,3 +296,49 @@
     border-color: #7BCFFF;
     box-shadow: 0 0 5px #7bcfffa3;
   }
+
+  .timelineVisible {
+    transform: translateX(0px);
+  }
+  
+  .timelineHidden {
+    transform: translateX(220px);
+  }
+
+  .timelineArrowVisible {
+    transform: translateX(-220px);
+  }
+  
+  .timelineArrowHidden {
+    transform: translateX(0px);
+  }
+  
+  /* Scrollbar styling for timeline */
+  .timelineVisible::-webkit-scrollbar,
+  .timelineHidden::-webkit-scrollbar {
+    width: 6px; /* Slimmer scrollbar */
+  }
+  
+  .timelineVisible::-webkit-scrollbar-track,
+  .timelineHidden::-webkit-scrollbar-track {
+    background: rgba(1, 2, 20, 0.4); /* Darker track, matches #01021464 */
+    border-radius: 8px;
+  }
+  
+  .timelineVisible::-webkit-scrollbar-thumb,
+  .timelineHidden::-webkit-scrollbar-thumb {
+    background: #818499; /* Matches your known/unknown text color */
+    border-radius: 8px;
+  }
+  
+  .timelineVisible::-webkit-scrollbar-thumb:hover,
+  .timelineHidden::-webkit-scrollbar-thumb:hover {
+    background: #a0a4b8;
+  }
+  
+  /* Firefox fallback (less granular) */
+  .timelineVisible,
+  .timelineHidden {
+    scrollbar-width: thin; /* Slim scrollbar */
+    scrollbar-color: #818499 rgba(1, 2, 20, 0.4); /* Thumb and track */
+  }

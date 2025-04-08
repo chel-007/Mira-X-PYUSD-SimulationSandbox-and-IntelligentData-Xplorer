@@ -41,7 +41,7 @@ html, body {
 
 .react-flow__controls {
   position: absolute !important;
-  bottom: 40px !important;
+  bottom: 10px !important;
   left: 20px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 5px;
@@ -62,22 +62,17 @@ html, body {
 .react-flow__background {
   background: rgba(129, 132, 153, 0.02) !important;
 }
+
+.react-flow {
+  height: calc(100% - 40px) !important;
+}
+
 .react-flow__background circle {
   fill: rgba(255, 255, 255, 0.1) !important;
 }
 
 
 .Toastify__toast--info {
-  background: rgba(129, 132, 153, 0.1) !important;
-  border: 1px solid #7bcfff !important;
-  border-radius: 4px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-  color: #999999 !important;
-  font-family: "Josefin Sans", sans-serif !important;
-  font-size: 0.9em !important;
-}
-
-.Toastify__toast--success {
   background: rgba(129, 132, 153, 0.1) !important;
   border: 1px solid #7bcfff !important;
   border-radius: 4px !important;
@@ -98,3 +93,49 @@ html, body {
 .Toastify__toast--info .Toastify__progress-bar {
   background: #7bcfff9d !important;
 }
+
+.Toastify__toast--success {
+  background: rgba(129, 132, 153, 0.1) !important;
+  border: 1px solid #46f436 !important;
+  border-radius: 4px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  color: #999999 !important;
+  font-family: "Josefin Sans", sans-serif !important;
+  font-size: 0.9em !important;
+}
+
+.Toastify__toast--success .Toastify__toast-icon {
+  color: #46f436 !important;
+}
+
+.Toastify__toast--success .Toastify__close-button {
+  color: #46f436 !important;
+}
+
+.Toastify__toast--success .Toastify__progress-bar {
+  background: #46f4369d !important;
+}
+
+.Toastify__toast--error {
+  background: rgba(244, 67, 54, 0.1) !important;
+  border: 1px solid #f44336 !important;
+  border-radius: 4px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  color: #999999 !important;
+  font-family: "Josefin Sans", sans-serif !important;
+  font-size: 0.9em !important;
+}
+
+.Toastify__toast--error .Toastify__toast-icon {
+  color: #f44336 !important;
+}
+
+.Toastify__toast--error .Toastify__close-button {
+  color: #f44336 !important;
+}
+
+.Toastify__toast--error .Toastify__progress-bar {
+  background: #f443369d !important;
+}
+
+

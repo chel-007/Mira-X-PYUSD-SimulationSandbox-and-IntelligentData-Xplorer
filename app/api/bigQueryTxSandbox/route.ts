@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
   `;
   const latestQueryGas = `
     SELECT MAX(block_timestamp) AS latest_timestamp
-    FROM \`${projectId}.pyusd_data.lp_activity_and_gas\`
+    FROM \`${projectId}.pyusd_data.lp_activity_and_gas_latest\`
   `;
   const [[txLatest], [gasLatest]] = await Promise.all([
     bigquery.query({ query: latestQueryTx }),
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
   SELECT 
     DATE(TIMESTAMP_SECONDS(block_timestamp)) AS tx_date,
     SUM(gas_used * gas_price / 1e18) AS total_gas_eth
-  FROM \`${projectId}.pyusd_data.lp_activity_and_gas\`
+  FROM \`${projectId}.pyusd_data.lp_activity_and_gas_latest\`
   WHERE 
     block_timestamp BETWEEN @startTime AND @endTime
     AND (

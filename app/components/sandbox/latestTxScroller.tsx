@@ -83,40 +83,40 @@ const LatestTxScroller = () => {
       
     ));
 
-  return (
-    <div
-      style={{
-        position: "absolute",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        background: "rgba(129, 132, 153, 0.08)",
-        padding: "10px",
-        overflow: "hidden",
-        height: "40px",
-        zIndex: 1000,
-      }}
-    >
+    return (
       <div
         style={{
-          display: "inline-block",
-          whiteSpace: "nowrap",
-          animation: latestTxs.length > 0 ? "scroll 140s linear infinite" : "none",
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          background: 'rgba(129, 132, 153, 0.08)',
+          padding: '10px',
+          overflow: 'hidden',
+          height: '40px',
+          zIndex: 10000,
         }}
       >
-        {renderTxList()}
-        {latestTxs.length > 0 && (
-          <span style={{ display: "block", width: "10px", background: "red" }} />
-        )}
+        <div
+          style={{
+            display: 'inline-block',
+            whiteSpace: 'nowrap',
+            animation: latestTxs.length > 0 ? 'scroll 140s linear infinite' : 'none',
+          }}
+        >
+          {renderTxList()}
+          {latestTxs.length > 0 && (
+            <span style={{ display: 'block', width: '10px', background: 'red' }} />
+          )}
+        </div>
+        <style jsx>{`
+          @keyframes scroll {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+          }
+        `}</style>
       </div>
-      <style jsx>{`
-        @keyframes scroll {
-          0% { transform: translateX(100%); }
-          100% { transform: translateX(-100%); }
-        }
-      `}</style>
-    </div>
-  );
+    );
 };
 
 export default LatestTxScroller;

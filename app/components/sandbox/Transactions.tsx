@@ -11,8 +11,9 @@ import { useSimulation } from '../../utils/SimulationContext';
 import SimulationResultBox from './SimulationResultBox';
 import { useData } from '../../utils/DataProvider';
 import { ToastContainer, toast } from 'react-toastify';
-import { useEthPrice } from "../../utils/EthPriceProvider";
 import 'react-toastify/dist/ReactToastify.css';
+import { useEthPrice } from "../../utils/EthPriceProvider";
+
 
 const gcpProjectId = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT_ID;
 const gcpApiKey = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_KEY;
@@ -77,7 +78,15 @@ const TextInputNode = ({ data, id }: { data: TextInputNodeData; id: string }) =>
       console.log(`Submitting TX: ${hash}`);
       if (data.onSubmit) data.onSubmit(hash);
     } else {
-      alert('Please enter a valid transaction hash (0x + 64 hex characters)');
+      toast.error("Please enter a valid transaction hash (0x + 64 hex characters)", {
+        position: "top-right",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+      // alert('Please enter a valid transaction hash (0x + 64 hex characters)');
     }
   };
 
@@ -114,28 +123,125 @@ const OptionsNode = ({ id, data }: { id: string; data: OptionsNodeData }) => (
   </div>
 );
 
+const CallNode = ({ data }) => {
+  const colors = {
+    pyusd: { bg: 'rgba(0, 102, 204)', border: '#818499' }, // Gold for PYUSD
+    usdc: {bg: '#00A3D6', border: '#007BA7'},
+    uniswap: { bg: '#FF69B4', border: '#FF1493' }, // Pink for Uniswap
+    coinbase: { bg: '#0052FF', border: '#0033CC' }, // Blue for Coinbase
+    kyberswap: { bg: '#31CB9E', border: '#1A8C6B' }, // Green for KyberSwap
+    usdt: { bg: '#26A17B', border: '#1A7559' }, // Teal for USDT
+    mev: { bg: '#FF4500', border: '#CC3700' }, // Red for MEV
+    unknown: { bg: '#333', border: '#fff' }, // Gray for unknowns
+  };
 
-const CallNode = ({ data }) => (
-  <div style={{ background: '#7BCFFF', padding: '10px', borderRadius: '5px', color: '#fff', position: 'relative' }}>
-    <Handle type="target" position={Position.Top} style={{ background: '#fff' }} />
-    <strong>Call</strong><br />
-    To: {data.to}<br />
-    Gas Used: {weiToEth(data.gasUsed)} ETH<br />
-    {data.contractName && <span style={{ fontSize: '12px' }}> ({data.contractName})</span>}
-    <Handle type="source" position={Position.Bottom} style={{ background: '#fff' }} />
-  </div>
-);
+  const getColor = () => {
+    if (data.isPyusd) return colors.pyusd;
+    if (!data.isKnown) return colors.unknown;
+    const name = data.contractName?.toLowerCase() || '';
+    if (name.includes('uniswap')) return colors.uniswap;
+    if (name.includes('coinbase')) return colors.coinbase;
+    if (name.includes('kyberswap')) return colors.kyberswap;
+    if (name === 'usdt') return colors.usdt;
+    if (name === 'usdc') return colors.usdc;
+    if (name.includes('mev')) return colors.mev;
+    return colors.unknown; // Fallback
+  };
 
-const ErrorNode = ({ data }) => (
-  <div style={{ background: '#FF6347', padding: '10px', borderRadius: '5px', color: '#fff', position: 'relative' }}>
-    <Handle type="target" position={Position.Top} style={{ background: '#fff' }} />
-    <strong>Error</strong><br />
-    To: {data.to}<br />
-    {data.error}<br />
-    {data.contractName && <span style={{ fontSize: '12px' }}> ({data.contractName})</span>}
-    <Handle type="source" position={Position.Bottom} style={{ background: '#fff' }} />
-  </div>
-);
+  const { bg, border } = getColor();
+
+  return (
+    <div
+      style={{
+        background: bg,
+        padding: '10px',
+        borderRadius: '5px',
+        color: '#fff',
+        position: 'relative',
+        border: data.isError ? '2px dashed #FF0000' : `1px solid ${border}`,
+      }}
+    >
+      <Handle type="target" position={Position.Top} style={{ background: '#fff' }} />
+      <strong>{data.type || 'Call'}</strong><br />
+      To: {data.to}<br />
+      Gas Used: {weiToEth(data.gasUsed)} ETH<br />
+      {data.isKnown && data.contractName &&<span style={{ fontSize: '12px' }}> ({data.contractName})</span>}
+      {data.isError && <span style={{ fontSize: '12px', color: '#FF0000' }}> (Failed)</span>}
+      <Handle type="source" position={Position.Bottom} style={{ background: '#fff' }} />
+    </div>
+  );
+};
+
+
+// const CallNode = ({ data }) => (
+//   <div style={{ background: '#7BCFFF', padding: '10px', borderRadius: '5px', color: '#fff', position: 'relative' }}>
+//     <Handle type="target" position={Position.Top} style={{ background: '#fff' }} />
+//     <strong>Call</strong><br />
+//     To: {data.to}<br />
+//     Gas Used: {weiToEth(data.gasUsed)} ETH<br />
+//     {data.contractName && <span style={{ fontSize: '12px' }}> ({data.contractName})</span>}
+//     <Handle type="source" position={Position.Bottom} style={{ background: '#fff' }} />
+//   </div>
+// );
+
+// const ErrorNode = ({ data }) => (
+//   <div style={{ background: '#FF6347', padding: '10px', borderRadius: '5px', color: '#fff', position: 'relative' }}>
+//     <Handle type="target" position={Position.Top} style={{ background: '#fff' }} />
+//     <strong>Error</strong><br />
+//     To: {data.to}<br />
+//     {data.error}<br />
+//     {data.contractName && <span style={{ fontSize: '12px' }}> ({data.contractName})</span>}
+//     <Handle type="source" position={Position.Bottom} style={{ background: '#fff' }} />
+//   </div>
+// );
+
+const ErrorNode = ({ data }) => {
+  const colors = {
+    pyusd: { bg: 'rgba(0, 102, 204)', border: '#FFA500' }, // Gold for PYUSD
+    uniswap: { bg: '#FF69B4', border: '#FF1493' }, // Pink for Uniswap
+    coinbase: { bg: '#0052FF', border: '#0033CC' }, // Blue for Coinbase
+    kyberswap: { bg: '#31CB9E', border: '#1A8C6B' }, // Green for KyberSwap
+    usdt: { bg: '#26A17B', border: '#1A7559' }, // Teal for USDT
+    mev: { bg: '#FF4500', border: '#CC3700' }, // Red for MEV
+    unknown: { bg: '#FF6347', border: '#fff' }, // Tomato red for unknown errors (your original)
+  };
+
+  const getColor = () => {
+    if (data.isPyusd) return colors.pyusd;
+    if (!data.isKnown) return colors.unknown;
+    const name = data.contractName?.toLowerCase() || '';
+    if (name.includes('uniswap')) return colors.uniswap;
+    if (name.includes('coinbase')) return colors.coinbase;
+    if (name.includes('kyberswap')) return colors.kyberswap;
+    if (name === 'usdt') return colors.usdt;
+    if (name.includes('mev')) return colors.mev;
+    return colors.unknown; // Fallback to your red for unknown errors
+  };
+
+  const { bg, border } = getColor();
+
+  return (
+    <div
+      style={{
+        background: bg,
+        padding: '10px',
+        borderRadius: '5px',
+        color: '#fff',
+        position: 'relative',
+        border: `2px dashed #FF0000`, // Dashed red border for all errors
+      }}
+    >
+      <Handle type="target" position={Position.Top} style={{ background: '#fff' }} />
+      <strong>Error</strong><br />
+      To: {data.to}<br />
+      {data.error}<br />
+      {data.isKnown && data.contractName && (
+        <span style={{ fontSize: '12px' }}> ({data.contractName})</span>
+      )}
+      <Handle type="source" position={Position.Bottom} style={{ background: '#fff' }} />
+    </div>
+  );
+};
 
 const SummaryNode = ({ data }) => {
   const contractNames = {
@@ -201,31 +307,6 @@ const DigDeeperNode = ({ id, data }) => (
     </button>
   </div>
 );
-
-// const InspectNode = ({ data }) => {
-//   const icons = {
-//     'Balances Of': 'fa-wallet',
-//     'Last Transacts': 'fa-list',
-//     'Cross Examine': 'fa-search',
-//   };
-//   const iconClass = data.loading ? 'fa-spinner fa-spin' : icons[data.option];
-
-//   return (
-//     <div style={{ 
-//       background: '#333', 
-//       padding: '10px', 
-//       borderRadius: '5px', 
-//       color: '#fff',
-//       display: 'flex',
-//       alignItems: 'center',
-//       gap: '8px',
-//     }}>
-//       <i className={`fa-solid ${iconClass}`} />
-//       <span>{data.option}</span>
-//       <Handle type="source" position={Position.Right} style={{ background: '#00ffcc' }} />
-//     </div>
-//   );
-// };
 
 const InspectNode = ({ data }) => {
   const icons = {
@@ -295,7 +376,7 @@ const SelectorNode = ({ data, id }) => {
 
   const handleChange = (e) => {
     const value = e.target.value;
-    console.log('Selector changed to:', value); // Debug
+    // console.log('Selector changed to:', value);
     setSelectedOption(value);
     if (data.onSelect) {
       data.onSelect(value); // Update mockInputs
@@ -316,11 +397,9 @@ const SelectorNode = ({ data, id }) => {
 };
 
 
-// Parse trace data
 const parseTrace = (trace, parentId, position, contractNames = {}) => {
-  // console.log('Parsing Trace:', trace);
   if (!trace || typeof trace !== 'object') {
-    // console.error('Invalid trace data:', trace);
+    console.error('Invalid trace data:', trace);
     return { nodes: [], edges: [], callCount: 0, errorCount: 0 };
   }
 
@@ -328,15 +407,24 @@ const parseTrace = (trace, parentId, position, contractNames = {}) => {
   const edges = [];
   const nodeId = `${parentId}-${trace.type || 'call'}-${Math.random().toString(36).substr(2, 5)}`;
 
+  const toLower = trace.to?.toLowerCase();
+  const isPyusd = toLower === PYUSD_MAINNET_ADDRESS
   const isError = trace.error || trace.revertReason;
+  const contractName = contractNames[toLower] || null;
+
   nodes.push({
     id: nodeId,
     type: isError ? 'errorNode' : 'callNode',
     data: {
       to: trace.to || 'Unknown',
       gasUsed: trace.gasUsed || '0',
+      value: trace.value || '0', // Include for tooltips (ETH or token amounts)
+      input: trace.input || '', // For decoding swaps, approvals, etc.
       error: isError ? (trace.error || trace.revertReason) : null,
-      contractName: contractNames[trace.to] || null,
+      contractName,
+      isPyusd,
+      isKnown: !!contractNames[toLower], // True if in contractNames
+      type: trace.type || 'call', // Keep call type (call, staticcall, etc.)
     },
     position: { x: position.x, y: position.y },
   });
@@ -356,22 +444,81 @@ const parseTrace = (trace, parentId, position, contractNames = {}) => {
     });
   }
 
-  // console.log('Generated Nodes:', nodes);
-  return { nodes, edges, callCount: nodes.length, errorCount: nodes.filter(n => n.type === 'errorNode').length };
+  return {
+    nodes,
+    edges,
+    callCount: nodes.length,
+    errorCount: nodes.filter((n) => n.type === 'errorNode').length,
+  };
 };
+
+
+// Parse trace data
+// const parseTrace = (trace, parentId, position, contractNames = {}) => {
+//   // console.log('Parsing Trace:', trace);
+//   if (!trace || typeof trace !== 'object') {
+//     // console.error('Invalid trace data:', trace);
+//     return { nodes: [], edges: [], callCount: 0, errorCount: 0 };
+//   }
+
+//   const nodes = [];
+//   const edges = [];
+//   const nodeId = `${parentId}-${trace.type || 'call'}-${Math.random().toString(36).substr(2, 5)}`;
+
+//   const isError = trace.error || trace.revertReason;
+//   nodes.push({
+//     id: nodeId,
+//     type: isError ? 'errorNode' : 'callNode',
+//     data: {
+//       to: trace.to || 'Unknown',
+//       gasUsed: trace.gasUsed || '0',
+//       error: isError ? (trace.error || trace.revertReason) : null,
+//       contractName: contractNames[trace.to] || null,
+//     },
+//     position: { x: position.x, y: position.y },
+//   });
+
+//   if (trace.calls && Array.isArray(trace.calls) && trace.calls.length > 0) {
+//     trace.calls.forEach((subcall, index) => {
+//       const subPosition = { x: position.x + 200, y: position.y + 180 * (index + 1) };
+//       const { nodes: subNodes, edges: subEdges } = parseTrace(subcall, nodeId, subPosition, contractNames);
+//       nodes.push(...subNodes);
+//       edges.push(...subEdges);
+//       edges.push({
+//         id: `e${nodeId}-${subNodes[0].id}`,
+//         source: nodeId,
+//         target: subNodes[0].id,
+//         animated: true,
+//       });
+//     });
+//   }
+
+//   // console.log('Generated Nodes:', nodes);
+//   return { nodes, edges, callCount: nodes.length, errorCount: nodes.filter(n => n.type === 'errorNode').length };
+// };
 
 
 const InputNode = ({ data, id }) => {
   const [value, setValue] = useState(data.value || '');
   const [lastAlertTime, setLastAlertTime] = useState(0);
   const inputRef = useRef(null);
+  const { simulationResult } = useSimulation(); // Access simulation result
+
+  // Determine if this is the "AmountOut" node and simulation has a result
+  const isAmountOut = data.label === 'AmountOut';
+  const isReadOnly = data.readOnly || (isAmountOut && !!simulationResult?.amountOut);
 
   useEffect(() => {
-    setValue(data.value || '');
-  }, [data.value]);
+    // Set value from data.value initially or simulationResult.amountOut if applicable
+    if (isAmountOut && simulationResult?.amountOut) {
+      setValue(simulationResult.amountOut);
+    } else {
+      setValue(data.value || '');
+    }
+  }, [data.value, simulationResult, isAmountOut]);
 
   const handleChange = (e) => {
-    if (!data.isWalletConnected || data.readOnly) {
+    if (!data.isWalletConnected || isReadOnly) {
       const now = Date.now();
       if (!data.isWalletConnected && now - lastAlertTime > 1000) {
         toast.error("Please connect your wallet first!", {
@@ -394,7 +541,7 @@ const InputNode = ({ data, id }) => {
   };
 
   const handleFocus = (e) => {
-    if (!data.isWalletConnected || data.readOnly) {
+    if (!data.isWalletConnected || isReadOnly) {
       const now = Date.now();
       if (!data.isWalletConnected && now - lastAlertTime > 1000) {
         toast.error("Please connect your wallet first!", {
@@ -425,18 +572,18 @@ const InputNode = ({ data, id }) => {
         value={value}
         onChange={handleChange}
         onFocus={handleFocus}
-        className={!data.isWalletConnected || data.readOnly ? styles.disabledInput : ''}
-        readOnly={data.readOnly}
+        className={!data.isWalletConnected || isReadOnly ? styles.disabledInput : ''}
+        readOnly={isReadOnly}
         title={
           !data.isWalletConnected
             ? "Please connect your wallet first"
-            : data.readOnly
+            : isReadOnly
             ? "This field is read-only"
             : ""
         }
       />
       <Handle type="source" position={Position.Bottom} style={{ background: '#00ffcc' }} />
-      <Handle type="target" position={Position.Bottom} id="bottom-target" style={{ background: '#00ffcc' }} /> {/* Add bottom target */}
+      <Handle type="target" position={Position.Bottom} id="bottom-target" style={{ background: '#00ffcc' }} />
     </div>
   );
 };
@@ -444,14 +591,20 @@ const InputNode = ({ data, id }) => {
 const MockButtonNode = ({ data, id }) => {
   const [loading, setLoading] = useState(false);
   const [isSimulated, setIsSimulated] = useState(false);
+  const [errorState, setErrorState] = useState(false);
   const { simulateTransfer, sendTransfer, simulateSwap } = useTransactionSimulation(data.rpcUrl);
   const { setSimulationResult, clearSimulation } = useSimulation();
   const isSwap = data.inputs?.AmountIn;
 
-  // console.log("amountin?",data.inputs?.AmountIn);
-  // console.log("inputs?",data.inputs);
-
   const handleMock = async () => {
+    if (errorState) {
+      // On "Restart" click, clear the flow (passed from Transactions.tsx)
+      data.clearFlow();
+      setErrorState(false);
+      setIsSimulated(false); // Reset for new simulation
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     clearSimulation();
     const { From, To, Amount, AmountIn, AmountOut, inputToken } = data.inputs || {};
@@ -464,12 +617,14 @@ const MockButtonNode = ({ data, id }) => {
         return;
       }
       try {
+        const { poolMetricsData } = data.useData();
         const result = await simulateSwap(
           From, 
           To || From,
           String(AmountIn),
           data.isMainnet,
-          inputToken
+          inputToken,
+          poolMetricsData
         );
         // console.log("simulation result", result)
         setSimulationResult(result);
@@ -482,6 +637,7 @@ const MockButtonNode = ({ data, id }) => {
         // );
       } catch (error) {
         setSimulationResult({ error: error.message });
+        setErrorState(true);
       } finally {
         setLoading(false);
       }
@@ -503,10 +659,12 @@ const MockButtonNode = ({ data, id }) => {
           const { txHash } = await sendTransfer(To, String(Amount), data.isMainnet);
           setSimulationResult({ txHash, status: 'Sent' }); // Update with txHash
           toast.success('Transfer successful!', { position: 'top-right' });
+          setErrorState(true);
         }
       } catch (error) {
-        console.error('Action error:', error);
+        // console.error('Action error:', error);
         setSimulationResult({ error: `Transfer failed: ${error.message}` });
+        setErrorState(true);
       } finally {
         setLoading(false);
       }
@@ -516,8 +674,22 @@ const MockButtonNode = ({ data, id }) => {
   return (
     <div className={styles.mockButtonNode}>
       <Handle type="target" position={Position.Top} style={{ background: '#00ffcc' }} />
-      <button onClick={handleMock} disabled={loading} style={{ background: 'green' }}>
-      {loading ? <i className="fa-spin fa-spinner" /> : isSimulated ? 'Send' : 'Simulate'}
+      <button
+        onClick={handleMock}
+        disabled={loading}
+        style={{
+          background: 'green',
+        }}
+      >
+        {loading ? (
+          <i className="fa-spin fa-spinner" />
+        ) : errorState ? (
+          'Restart'
+        ) : isSimulated ? (
+          'Send'
+        ) : (
+          'Simulate'
+        )}
       </button>
       <Handle type="source" position={Position.Bottom} style={{ background: '#00ffcc' }} />
     </div>
@@ -542,30 +714,32 @@ const nodeTypes = {
 };
 
 const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, setEdges: any, nodes: CustomNode[], edges: Edge[] }) => {
-  const { trace, receipt, loading, error, resetTrace, fetchTrace } = useTransactionTrace();
-  const { setSimulationResult, clearSimulation } = useSimulation();
-  const { setIsMainnet } = useSimulation();
   const chainId = useChainId();
-  useEffect(() => {
-    setIsMainnet(chainId === 1); // true for mainnet, false for Sepolia
-  }, [chainId, setIsMainnet]);
+  const isMainnet = chainId === 1; // Single source of truth
+  const isSepolia = chainId === 11155111;
+  const rpcUrlRef = useRef(isMainnet ? MAINNET_RPC_URL : SEPOLIA_RPC_URL); // Ref for RPC
+  const { address } = useAccount();
+  const isWalletConnected = !!address;
+  const { trace, receipt, loading, error, resetTrace, fetchTrace } = useTransactionTrace();
+  const { setSimulationResult, clearSimulation } = useSimulation(); // Keep other context funcs
   const [fetchingNodeId, setFetchingNodeId] = useState(null);
   const { setCenter } = useReactFlow();
-  const { address } = useAccount();
   const { timeOfDay, gasFeeData, poolMetricsData } = useData();
-    const { ethPrice, loading: ethPriceLoading } = useEthPrice();
+  const { ethPrice, loading: ethPriceLoading } = useEthPrice();
   const [mockInputs, setMockInputs] = useState({});
   const [amountNodeId, setAmountNodeId] = useState(null);
+  const [timeline, setTimeline] = useState([]);
+  const [isTimelineOpen, setIsTimelineOpen] = useState(true);
 
-  const isMainnet = chainId === 1;
-  const isSepolia = chainId === 11155111;
-  const rpcUrl = isMainnet ? MAINNET_RPC_URL : SEPOLIA_RPC_URL;
-  const isWalletConnected = !!address; // True if address is defined, false if undefined
-
+  // Single useEffect for network updates
   useEffect(() => {
-    // console.log(`Wallet connected to ${isMainnet ? 'Mainnet' : isSepolia ? 'Sepolia' : 'Unknown'}, RPC: ${rpcUrl}`);
-    // console.log("address", address)
-    toast.info(`Connected network changed! ${isMainnet ? 'Mainnet' : isSepolia ? 'Sepolia' : 'Unknown'}`, {
+    console.log("chainId changed to:", chainId);
+    const newIsMainnet = chainId === 1;
+    rpcUrlRef.current = newIsMainnet ? MAINNET_RPC_URL : SEPOLIA_RPC_URL;
+    console.log("Transactions isMainnet:", newIsMainnet, "RPC:", rpcUrlRef.current);
+
+    // Toast notification for network change
+    toast.info(`Connected network changed! ${newIsMainnet ? 'Mainnet' : isSepolia ? 'Sepolia' : 'Unknown'}`, {
       position: "top-right",
       autoClose: 5000,
       hideProgressBar: false,
@@ -573,7 +747,23 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
       pauseOnHover: true,
       draggable: true,
     });
-  }, [chainId]);
+  }, [chainId, isSepolia]); // Depend only on chainId
+
+  const clearFlow = () => {
+    setNodes([]);
+    setEdges([]);
+    setMockInputs({});
+    setTimeline([]);
+    setAmountNodeId(null); // Clear amountNodeId
+    setFetchingNodeId(null);
+    if (typeof resetTrace === 'function' || typeof clearSimulation === 'function') {
+      resetTrace();
+      clearSimulation();
+    } else {
+      console.error('resetTrace is not a function:', resetTrace);
+    }
+  };
+
 
   // Validate Ethereum address
   const isValidEthAddress = (addr) => /^0x[a-fA-F0-9]{40}$/.test(addr);
@@ -587,7 +777,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
     }
     setMockInputs((prev) => {
       const newInputs = { ...prev, [label]: value };
-      console.log('mockInputs updated:', newInputs);
+      // console.log('mockInputs updated:', newInputs);
       if (label === 'Amount' || label === 'AmountIn') {
         setAmountNodeId(nodeId);
       }
@@ -649,7 +839,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
       isValidEthAddress(mockInputs.From) &&
       (isSwap ? parseFloat(mockInputs.AmountIn) > 0 : parseFloat(mockInputs.Amount) > 0);
   
-    console.log('useEffect debug:', { mockInputs, hasAllFields, isValidInputs, amountNodeId, amountNode, existingMockNode });
+    // console.log('useEffect debug:', { mockInputs, hasAllFields, isValidInputs, amountNodeId, amountNode, existingMockNode });
   
     if (!isWalletConnected) {
       if (existingMockNode) {
@@ -681,14 +871,15 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
             data: {
               inputs: mockInputs,
               isMainnet,
-              rpcUrl,
               ethPrice,
+              rpcUrl: rpcUrlRef.current,
               useData: () => ({ timeOfDay, gasFeeData, poolMetricsData }),
+              clearFlow
             },
             position: mockPosition,
           },
         ];
-        console.log('MockButton added:', updatedNodes.find((n) => n.id === mockId));
+        // console.log('MockButton added:', updatedNodes.find((n) => n.id === mockId));
         return updatedNodes;
       });
   
@@ -697,9 +888,10 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
         { id: `e${amountNode.id}-${mockId}`, source: amountNode.id, target: mockId, animated: true },
       ]);
     }
-  }, [mockInputs, amountNodeId, setNodes, setEdges, isMainnet, rpcUrl, timeOfDay, isWalletConnected, ethPrice, nodes]);
+  }, [mockInputs, amountNodeId, setNodes, setEdges, isMainnet, rpcUrlRef, timeOfDay, isWalletConnected, ethPrice, nodes, clearFlow]);
 
   const addInitialOptionsNode = (x, y) => {
+    console.log("inside add", isMainnet)
     const newNode = {
       id: `${Date.now()}`,
       type: 'options',
@@ -735,6 +927,9 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
                           data: {
                             label: 'Enter TX Hash',
                             onSubmit: (hash) => {
+                              setTimeline([]);
+                              resetTrace();
+                              console.log("Submitting hash:", hash, "with RPC:", rpcUrlRef.current);
                               setFetchingNodeId(newId);
                               // Clear previous result nodes and edges
                               setNodes((nds) => {
@@ -773,8 +968,18 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
                                   );
                                 });
                               });
+                              console.log("fetchTrace called");
                               resetTrace(); // Clear trace/receipt
-                              fetchTrace(hash);
+                              fetchTrace(hash, rpcUrlRef.current);
+                              if (receipt && trace) {
+                                if (isPyusdTransaction(receipt, trace, isMainnet)) {
+                                  console.log("Valid PYUSD transaction");
+                                } else {
+                                  toast.error("This transaction does not involve PYUSD. Please enter a PYUSD-related TX.");
+                                  resetTrace();
+                                  setFetchingNodeId(null);
+                                }
+                              } 
                             },
                           },
                           position: { x: position.x + 200, y: position.y + 100 },
@@ -924,23 +1129,37 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
 
   const PYUSD_ADDRESS = '0x6c3ea9036406852006290770bedfcaba0e23a0e8'.toLowerCase();
 
-  const isPyusdTransaction = (trace: any): boolean => {
-    if (!trace) return false;
-    if (trace.to?.toLowerCase() === PYUSD_ADDRESS) return true;
-    if (trace.calls) {
-      for (const call of trace.calls) {
-        if (isPyusdTransaction(call)) return true;
-      }
+  useEffect(() => {
+    if (trace && receipt && fetchingNodeId) {
+      console.log("Processing trace/receipt for node:", fetchingNodeId);
+      handleDataFetched(fetchingNodeId, trace, receipt);
+      setFetchingNodeId(null);
     }
-    return false;
+  }, [trace, receipt, fetchingNodeId]);
+
+  const isPyusdTransaction = (receipt, trace, isMainnet) => {
+    const pyusdAddress = isMainnet ? PYUSD_MAINNET_ADDRESS : PYUSD_SEPOLIA_ADDRESS;
+    // Check receipt 'to' field
+    if (receipt.to && receipt.to.toLowerCase() === pyusdAddress) return true;
+    // Check trace for calls to PYUSD
+    const checkTrace = (call) => {
+      if (call.to && call.to.toLowerCase() === pyusdAddress) return true;
+      if (call.calls) return call.calls.some(checkTrace);
+      return false;
+    };
+    return trace && checkTrace(trace);
   };
 
   const handleDataFetched = (nodeId: string, trace: any, receipt: any) => {
-    if (!isPyusdTransaction(trace)) {
-      alert('Only PYUSD transactions are supported.');
-      return;
+    if (!isPyusdTransaction(receipt, trace, isMainnet)) {
+      toast.error("Only PYUSD transactions are supported. Please enter a PYUSD-related TX.");
+      resetTrace();
+      return; // Exit early, no nodes added
     }
-    // console.log('Handle Data Fetched:', { trace, receipt });
+    // console.log("Valid PYUSD transaction");
+
+    setTimeline([]);
+
     const parentNode = nodes.find((n) => edges.some((e) => e.target === nodeId && e.source === n.id));
     if (!parentNode) {
       // console.error('Parent node not found for ID:', nodeId);
@@ -953,66 +1172,109 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
       '0x264bd8291fae1d75db2c5f573b07faa6715997b5': 'Paxos 4',
       '0x6c3ea9036406852006290770bedfcaba0e23a0e8': 'PYUSD',
       '0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43': 'Coinbase 10',
+      // Expanded known contracts
+      '0x7a250d5630b4cf539739df2c5dacb4c659f2488d': 'Uniswap V2 Router',
+      '0x1111111254eeb25477b68fb85ed929f73a960582': '1inch V5',
+      '0xe592427a0aece92de3edee1f18e0157c05861564': 'Uniswap V3 Router',
+      '0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45': 'Uniswap Universal Router',
+      '0xdef1c0ded9bec7f1a1670819833240f027b25eff': '0x Exchange Proxy',
+      '0x9008d19f58aabd9ed0d60971565aa8510560ab41': 'KyberSwap',
+      '0x00000000000000adc04c56bf30ac9d3c0aaf14dc': 'Seaport (OpenSea)', // Example marketplace
+      '0x0000000000a39bb272e79075ade125fd351887ac': 'Blur Pool', // NFT-related
+      // MEV Bots (example addresses - adjust based on known patterns)
+      '0x000000000000000000000000000000000000dead': 'MEV Bot (Burner)',
+      '0x0000000000007f150bd6f54c40a34d7c3d5e9f56': 'MEV Bot (Common)',
     };
-  
-    const startPosition = { x: parentNode.position.x + 500, y: parentNode.position.y - 150 };
-    const { nodes: traceNodes, edges: traceEdges, callCount, errorCount } = parseTrace(trace, nodeId, startPosition, contractNames);
-  
-    if (traceNodes.length === 0) {
-      console.error('No trace nodes generated');
-      return;
-    }
-  
-    // Parse receipt logs for PYUSD Transfer event
-    const transferLog = receipt.logs.find((log: any) => 
-      log.address.toLowerCase() === PYUSD_ADDRESS &&
-      log.topics[0] === '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
-    );
-    let from = 'Unknown';
-    let to = 'Unknown';
-    let pyusdValue = '0';
-    if (transferLog) {
-      from = `0x${transferLog.topics[1].slice(-40)}`; // Extract 'from' from topic[1]
-      to = `0x${transferLog.topics[2].slice(-40)}`;   // Extract 'to' from topic[2]
-      pyusdValue = (parseInt(transferLog.data, 16) / 1e6).toFixed(2); // Convert from wei (6 decimals for PYUSD)
-    }
-  
-    const highestGasNode = traceNodes.reduce((max, node) => 
-      parseInt(node.data.gasUsed || '0', 16) > parseInt(max.data.gasUsed || '0', 16) ? node : max, traceNodes[0]);
-    const highestGasEth = weiToEth(highestGasNode.data.gasUsed);
-    const summaryData = {
-      callCount,
-      errorCount,
-      highestGasContract: highestGasNode.data.contractName || highestGasNode.data.to,
-      highestGasEth,
-      from,
-      to,
-      pyusdValue,
-    };
-  
-    const lastNode = traceNodes[traceNodes.length - 1] || parentNode;
-    const summaryNode = {
-      id: `${Date.now()}-summary`,
-      type: 'summaryNode',
-      data: summaryData,
-      position: { x: lastNode.position.x + 50, y: lastNode.position.y + 150 },
-    };
-  
-    const containerLeft = startPosition.x - 20;
-    const rightmostX = Math.max(lastNode.position.x + 50, summaryNode.position.x + 300);
-    const containerWidth = rightmostX - containerLeft + 50;
-    
-    const containerTop = startPosition.y - 40;
-    const summaryBottom = summaryNode.position.y + 150;
-    const containerHeight = summaryBottom - containerTop + 60;
-  
-    const containerNode = {
-      id: `${nodeId}-container`,
-      type: 'traceContainer',
-      data: { label: '' },
-      position: { x: startPosition.x - 20, y: startPosition.y - 50 },
-      style: { width: containerWidth, height: containerHeight },
-    };
+
+  const startPosition = { x: parentNode.position.x + 500, y: parentNode.position.y - 150 };
+  const { nodes: traceNodes, edges: traceEdges, callCount, errorCount } = parseTrace(trace, nodeId, startPosition, contractNames);
+
+  if (traceNodes.length === 0) {
+    console.error('No trace nodes generated');
+    return;
+  }
+
+  const transferLog = receipt.logs.find((log: any) =>
+    log.address.toLowerCase() === (isMainnet ? PYUSD_MAINNET_ADDRESS : PYUSD_SEPOLIA_ADDRESS) &&
+    log.topics[0] === '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+  );
+  let from = 'Unknown';
+  let to = 'Unknown';
+  let pyusdValue = '0';
+  if (transferLog) {
+    from = `0x${transferLog.topics[1].slice(-40)}`;
+    to = `0x${transferLog.topics[2].slice(-40)}`;
+    pyusdValue = (parseInt(transferLog.data, 16) / 1e6).toFixed(2);
+  }
+
+  const highestGasNode = traceNodes.reduce((max, node) =>
+    parseInt(node.data.gasUsed || '0', 16) > parseInt(max.data.gasUsed || '0', 16) ? node : max, traceNodes[0]);
+  const highestGasEth = weiToEth(highestGasNode.data.gasUsed);
+  const summaryData = {
+    callCount,
+    errorCount,
+    highestGasContract: highestGasNode.data.contractName || highestGasNode.data.to,
+    highestGasEth,
+    from,
+    to,
+    pyusdValue,
+  };
+
+    // Build timeline with collapsed repeats and sliced unknowns
+    const timelineData = [];
+    let lastAddress = null;
+    let lastType = null;
+    traceNodes.forEach((node, index) => {
+      const { to, contractName, type, isError } = node.data;
+      const address = to?.toLowerCase();
+      console.log("address", address)
+      const label = contractName || (to && typeof to === 'string' ? `${to.slice(0, 6)}...${to.slice(-4)}` : 'Unknown');
+      console.log("label", label)
+      if (address === lastAddress && type === lastType && !isError) {
+        timelineData.push({ id: node.id, isDot: true });
+      } else {
+        timelineData.push({
+          id: node.id,
+          label: `${index + 1}. ${label} ${type || 'Call'}${isError ? ' (Failed)' : ''}`,
+          isPyusd: node.data.isPyusd,
+          isKnown: node.data.isKnown,
+          isDot: false,
+        });
+        lastAddress = address;
+        lastType = type;
+      }
+    });
+    setTimeline(timelineData);
+
+// Find the deepest y position among all trace nodes
+const deepestNode = traceNodes.reduce((deepest, node) => 
+  (node.position.y + (node.style?.height || 100)) > (deepest.position.y + (deepest.style?.height || 100)) ? node : deepest, 
+  traceNodes[0]
+);
+const summaryNode = {
+  id: `${Date.now()}-summary`,
+  type: 'summaryNode',
+  data: summaryData,
+  position: { x: deepestNode.position.x + 50, y: deepestNode.position.y + (deepestNode.style?.height || 100) + 40 }, // Below deepest node
+};
+
+// Calculate container bounds including all nodes
+const allNodes = [...traceNodes, summaryNode];
+const containerLeft = Math.min(...allNodes.map((n) => n.position.x)) - 20;
+const containerRight = Math.max(...allNodes.map((n) => n.position.x + (n.style?.width || 200))) + 150;
+const containerTop = Math.min(...allNodes.map((n) => n.position.y)) - 50;
+const containerBottom = Math.max(...allNodes.map((n) => n.position.y + (n.style?.height || 100))) + 100;
+const containerWidth = containerRight - containerLeft;
+const containerHeight = containerBottom - containerTop;
+
+const containerNode = {
+  id: `${nodeId}-container`,
+  type: 'traceContainer',
+  data: { label: '' },
+  position: { x: containerLeft, y: containerTop },
+  style: { width: containerWidth, height: containerHeight },
+  draggable: false,
+};
 
     // Add DigDeeperNode at container midpoint
     const digDeeperNode = {
@@ -1164,9 +1426,15 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
   
     setNodes((nds) => {
       const updatedNodes = [...nds, containerNode, ...traceNodes, summaryNode, digDeeperNode];
-      // console.log('Updated Nodes:', updatedNodes);
+
+      setTimeout(() => {
+        const endX = summaryNode.position.x + (summaryNode.style?.width || 200) / 2;
+        const endY = summaryNode.position.y + (summaryNode.style?.height || 100) / 2;
+        setCenter(endX, endY, { zoom: 1.0, duration: 500 }); // Direct pan, 500ms
+      }, 100);
+
       return updatedNodes;
-    });
+      });
     setEdges((eds) => {
       const updatedEdges = [...eds, ...traceEdges];
       // console.log('Updated Edges:', updatedEdges);
@@ -1174,26 +1442,17 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
     });
   };
 
-  useEffect(() => {
-    if (trace && receipt && fetchingNodeId) {
-      console.log('Trace and Receipt Data Received:', { trace, receipt });
-      handleDataFetched(fetchingNodeId, trace, receipt);
-      setFetchingNodeId(null);
-    }
-  }, [trace, receipt, fetchingNodeId]);
+  // useEffect(() => {
+  //   if (trace && receipt && fetchingNodeId) {
+  //     console.log('Trace and Receipt Data Received:', { trace, receipt });
+  //     handleDataFetched(fetchingNodeId, trace, receipt);
+  //     setFetchingNodeId(null);
+  //   }
+  // }, [trace, receipt, fetchingNodeId]);
 
-  const clearFlow = () => {
-    setNodes([]);
-    setEdges([]);
-    setMockInputs({}); // Clear mockInputs
-    setAmountNodeId(null); // Clear amountNodeId
-    setFetchingNodeId(null);
-    if (typeof resetTrace === 'function' || typeof clearSimulation === 'function') {
-      resetTrace();
-      clearSimulation();
-    } else {
-      console.error('resetTrace is not a function:', resetTrace);
-    }
+  const toggleTimeline = () => {
+    setIsTimelineOpen((prev) => !prev); // Toggle state
+    console.log('Timeline toggled, isOpen:', !isTimelineOpen); // Debug state change
   };
 
   return (
@@ -1202,7 +1461,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
         <div className={styles.centerButton}>
           <button
             className={styles.plusButton}
-            onClick={() => addInitialOptionsNode(200, 100)}
+            onClick={() => addInitialOptionsNode(100, 100)}
           >
             <i className="fa-sharp fa-light fa-plus"></i>
           </button>
@@ -1226,8 +1485,8 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
           <i className="fa-duotone fa-thin fa-rotate-left"></i>
         </button>
         <ToastContainer
-        position="top-right" // Adjust position as needed
-        autoClose={5000} // Closes after 5 seconds
+        position="top-right"
+        autoClose={5000}
         hideProgressBar={false}
         newestOnTop={false}
         closeOnClick
@@ -1235,10 +1494,83 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
         pauseOnFocusLoss
         draggable
         pauseOnHover
-        style={{ zIndex: 10000 }}
+        style={{ 
+          zIndex: 10000
+        }}
       />
-        <LatestTxScroller />
+      {timeline.length > 0 && (
+        <>
+          <button
+            className={`${isTimelineOpen ? styles.timelineArrowVisible : styles.timelineArrowHidden}`}
+            style={{
+              position: 'fixed',
+              right: '10px',
+              top: 'calc(90px + 40px)',
+              width: '20px',
+              height: '40px',
+              background: '#01021464',
+              color: '#ccc',
+              border: 'none',
+              borderRadius: '8px 0 0 8px',
+              cursor: 'pointer',
+              zIndex: 1001,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 5px rgba(0, 0, 0, 0.3)',
+              transition: 'transform 0.5s ease-in-out',
+            }}
+            onClick={toggleTimeline}
+          >
+             {isTimelineOpen ? '▶' : '◀'}
+          </button>
+          <div
+            className={`${isTimelineOpen ? styles.timelineVisible : styles.timelineHidden}`}
+            style={{
+              position: 'fixed',
+              right: '10px',
+              top: 90,
+              width: '220px',
+              maxHeight: '50vh',
+              overflowY: 'auto',
+              background: '#01021464',
+              padding: '10px',
+              borderRadius: '8px',
+              boxShadow: '0 2px 5px rgba(0, 0, 0, 0.3)',
+              zIndex: 1000,
+              transition: 'transform 0.5s ease-in-out',
+            }}
+          >
+            {timeline.map((step, idx) => (
+              <div
+                key={step.id}
+                style={{
+                  cursor: 'pointer',
+                  color: step.isPyusd ? 'rgba(0, 102, 204)' : step.isKnown ? '#818499' : '#818499',
+                  margin: '5px 0',
+                  padding: step.isDot ? '0' : '5px',
+                  background: step.isPyusd && !step.isDot ? 'transparent' : 'transparent',
+                  borderRadius: '3px',
+                  fontSize: step.isDot ? '13px' : '12px',
+                  fontWeight: 300,
+                  fontFamily: "Josefin Sans, sans-serif",
+                  textAlign: step.isDot ? 'left' : 'left',
+                }}
+                onClick={() => {
+                  const node = nodes.find((n) => n.id === step.id);
+                  if (node) setCenter(node.position.x + 100, node.position.y + 50, { zoom: 1.0, duration: 500 });
+                }}
+              >
+                {step.isDot ? '•' : step.label}
+              </div>
+            ))}
+        </div>
+        </>
+      )}
+        
       </ReactFlow>
+      <LatestTxScroller />
+
       <SimulationResultBox timeOfDay={timeOfDay} gasFeeData={gasFeeData} poolMetricsData={poolMetricsData} />
     </>
   );

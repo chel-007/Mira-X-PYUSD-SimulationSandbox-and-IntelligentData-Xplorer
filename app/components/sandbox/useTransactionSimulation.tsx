@@ -5,8 +5,8 @@ import { useSendTransaction } from 'wagmi';
 
 const PYUSD_MAINNET_ADDRESS = '0x6c3ea9036406852006290770bedfcaba0e23a0e8';
 const PYUSD_SEPOLIA_ADDRESS = '0xcac524bca292aaade2df8a05cc58f0a65b1b3bb9';
-const CURVE_POOL_PYUSD_CRVUSD = '0x625e92624bc2d88619accc1788365a69767f6200'; // PYUSD/crvUSD
-const CURVE_POOL_PYUSD_USDC = '0x383e6b4437b59fff47b619cba855ca29342a8559'; // PYUSD/USDC
+const CURVE_POOL_PYUSD_CRVUSD = '0x625e92624bc2d88619accc1788365a69767f6200';
+const CURVE_POOL_PYUSD_USDC = '0x383e6b4437b59fff47b619cba855ca29342a8559';
 
 
 const erc20Abi = [
@@ -48,6 +48,8 @@ export const useTransactionSimulation = (rpcUrl: any) => {
   const { data: walletClient } = useWalletClient();
   const provider = new JsonRpcProvider(rpcUrl);
   const { sendTransaction } = useSendTransaction();
+
+  console.log("rpcurl", rpcUrl)
 
   const simulateTransfer = async (from: string, to: string, amount: string, isMainnet: boolean) => {
     const contractAddress = isMainnet ? PYUSD_MAINNET_ADDRESS : PYUSD_SEPOLIA_ADDRESS;
@@ -91,6 +93,7 @@ export const useTransactionSimulation = (rpcUrl: any) => {
     return {
       gasEstimate: gasEstimate.toString(), // Units
       gasPrice: gasPrice.toString(),
+      amount: amount,
       simulationResult,
     };
   };
@@ -133,14 +136,12 @@ export const useTransactionSimulation = (rpcUrl: any) => {
     to: string,
     amountIn: string,
     isMainnet: boolean,
-    tokenIn: string
+    tokenIn: string,
+    poolMetricsData: any[]
   ) => {
-    // console.log('Simulating swap...', { from, to, amountIn, tokenIn });
-
-    // Map tokenIn to pool address and decimals
     const poolConfig = {
-      USDC: { address: CURVE_POOL_PYUSD_USDC, decimals: 6, abi: curvePoolAbi },
-      crvUSD: { address: CURVE_POOL_PYUSD_CRVUSD, decimals: 18, abi: curvePoolAbi },
+      USDC: { address: CURVE_POOL_PYUSD_USDC, decimals: 6, tokenAddress: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' }, // USDC Mainnet address
+      crvUSD: { address: CURVE_POOL_PYUSD_CRVUSD, decimals: 18, tokenAddress: '0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E' }, // crvUSD Mainnet address
     };
 
     const config = poolConfig[tokenIn];
@@ -149,61 +150,74 @@ export const useTransactionSimulation = (rpcUrl: any) => {
     }
 
     const amountInWei = parseUnits(amountIn, config.decimals);
-    const pyusdAddress = isMainnet ? PYUSD_MAINNET_ADDRESS : PYUSD_SEPOLIA_ADDRESS;
+    const tokenContractAddress = isMainnet ? config.tokenAddress : config.tokenAddress; // Adjust for Sepolia if needed
 
-    let swapTx;
-    if (tokenIn === 'USDT') {
-      // Uniswap swap (assuming tokenIn is token0, PYUSD is token1)
-      swapTx = {
-        from,
-        to: config.address,
-        value: '0',
-        data: encodeFunctionData({
-          abi: config.abi,
-          functionName: 'swap',
-          args: [
-            to, // Recipient
-            true, // zeroForOne (tokenIn → PYUSD)
-            amountInWei, // amountSpecified
-            0, // sqrtPriceLimitX96 (no limit for simulation)
-            '0x',
-          ],
-        }),
-      };
-    } else {
-      // Curve swap (USDC or crvUSD → PYUSD)
-      const i = tokenIn === 'USDC' ? 1 : 0; // Index of tokenIn in pool
-      const j = tokenIn === 'USDC' ? 0 : 1; // Index of PYUSD in pool
-      swapTx = {
-        from,
-        to: config.address,
-        value: 0,
-        data: encodeFunctionData({
-          abi: config.abi,
-          functionName: 'exchange',
-          args: [
-            i, // Token in index
-            j, // Token out index
-            amountInWei,
-            0, // min_dy (no minimum for simulation)
-          ],
-        }),
-      };
+    // Check balance
+    const balanceData = encodeFunctionData({
+      abi: erc20Abi,
+      functionName: 'balanceOf',
+      args: [from],
+    });
+    const balanceRaw = await provider.call({ to: tokenContractAddress, data: balanceData });
+    const balance = BigInt(balanceRaw);
+    if (balance < amountInWei) {
+      throw new Error(`Insufficient ${tokenIn} balance: ${balance} < ${amountInWei}`);
     }
 
-    try {
-      const gasEstimate = await provider.estimateGas(swapTx);
-      console.log('Swap Gas Estimate:', gasEstimate.toString());
+    // Prepare swap transaction
+    const i = tokenIn === 'USDC' ? 1 : 0; // Index of tokenIn
+    const j = tokenIn === 'USDC' ? 0 : 1; // Index of PYUSD
+    const swapTx = {
+      from,
+      to: config.address,
+      value: 0,
+      data: encodeFunctionData({
+        abi: curvePoolAbi,
+        functionName: 'exchange',
+        args: [i, j, amountInWei, 0],
+      }),
+    };
 
-      return {
-        gasEstimate: gasEstimate.toString(),
-        amountIn,
-        tokenIn,
-      };
-    } catch (error) {
-      console.error('Swap simulation failed:', error);
-      throw new Error('Failed to simulate swap');
+    // Simulate with overridden state (mock approval)
+    const gasEstimate = await provider.estimateGas({
+      ...swapTx,
+      // Optional: Uncomment if you want to simulate approval explicitly
+      // stateOverride: {
+      //   [tokenContractAddress]: {
+      //     stateDiff: {
+      //       [`keccak256(encodePacked(from, poolAddress))`]: amountInWei.toString(), // Mock allowance
+      //     },
+      //   },
+      // },
+    });
+    const gasPrice = (await provider.getFeeData()).gasPrice || BigInt(await provider.send('eth_gasPrice', []));
+
+    // Calculate slippage and amount out using poolMetricsData
+    const pool = poolMetricsData.find((p) => p.pool_address.toLowerCase() === config.address.toLowerCase());
+    if (!pool) {
+      throw new Error('Pool data not available');
     }
+
+    const tvl = pool.tvl_usd;
+    const volume24h = pool.total_volume_usd;
+    const amountInNum = parseFloat(amountIn);
+    const amountInUsd = amountInNum; // Stablecoin 1:1 USD
+    const reserveUsd = tvl / 2;
+    const priceImpact = amountInUsd / (reserveUsd + amountInUsd);
+    const volumeFactor = volume24h / tvl;
+    let slippage = priceImpact * (1 + volumeFactor);
+    slippage = Math.min(slippage, 0.001);
+
+    const amountOut = amountInNum * (1 - slippage);
+
+    return {
+      gasEstimate: gasEstimate.toString(),
+      gasPrice: gasPrice.toString(),
+      amountIn,
+      tokenIn,
+      amountOut: amountOut.toFixed(6),
+      slippage: (slippage * 100).toFixed(2) + '%',
+    };
   };
 
   return { simulateTransfer, simulateSwap, sendTransfer };

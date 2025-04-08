@@ -6,10 +6,15 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 interface SimulationResult {
   gasEstimate?: string;
   gasPrice?: string; // Added for SimulationResultBox
+  amount?: string;
   simulationResult?: string;
   error?: string;
   status?: string; // Added for "Sending now" and "Sent"
   txHash?: string; // Added for transaction hash
+  amountIn?: string;
+  amountOut?: string;
+  slippage?: string;
+  tokenIn?: string;
 }
 
 // Define the full context type
@@ -17,7 +22,7 @@ interface SimulationContextType {
   simulationResult: SimulationResult | null;
   setSimulationResult: (result: SimulationResult | null) => void;
   clearSimulation: () => void;
-  amountOut: string | null; // Already in your state
+  amountOut: string | null;
   setAmountOut: (value: string | null) => void;
   from?: string;
   setFrom: (value: string | undefined) => void;
@@ -72,7 +77,6 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-// Type-safe hook
 export const useSimulation = () => {
   const context = useContext(SimulationContext);
   if (context === undefined) {

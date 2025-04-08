@@ -14,6 +14,8 @@ mirax_access.json
 latest_lp_activity_and_gas.jsonl
 filtered_lp_activity_and_gas.jsonl
 
+/app/components/sandbox/uniswap_pool_fetch.js
+
 
 # Environment variables
 .env

@@ -17,130 +17,184 @@ const SimulationResultBox = ({
   const [sending, setSending] = useState(false);
   
 
-  const getTransferSuggestions = (gasEstimate: string, gasPrice: string) => {
-    const gasUnits = BigInt(gasEstimate);         // 66532
-    const gasPriceWei = BigInt(gasPrice);         // 1317282
-    const gasWei = gasUnits * gasPriceWei;        // 87641406024
-    const gasEth = Number(gasWei) / 1_000_000_000_000_000_000; // Explicit 1e18
+  const getTransferSuggestions = (gasEstimate: string, gasPrice: string, transferAmount?: string) => {
+    const gasUnits = BigInt(gasEstimate);
+    const gasPriceWei = BigInt(gasPrice);
+    const gasWei = gasUnits * gasPriceWei;
+    const gasEth = Number(gasWei) / 1_000_000_000_000_000_000;
   
-    console.log("timeofday", timeOfDay)
-    console.log("gasFeeData", gasFeeData)
-  
-    // --- Time-of-Day Insights (7-day window) ---
+    // --- Current Time ---
     const now = new Date();
-    const currentHour = now.getUTCHours();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    sevenDaysAgo.setUTCHours(0, 0, 0, 0);
+    const currentHour = now.getUTCHours(); // 0-23 UTC
+    const today = now.toISOString().split('T')[0]; // "2025-04-07"
   
-    const sevenDayTimeOfDay = timeOfDay.filter(d => new Date(d.event_date) >= sevenDaysAgo);
-    const hourlyAverages = sevenDayTimeOfDay.reduce((acc, d) => {
-      const hour = d.hour_of_day;
-      acc[hour] = acc[hour] || { total: 0, count: 0 };
-      acc[hour].total += d.avg_gas_fee_eth * d.transaction_count;
-      acc[hour].count += d.transaction_count;
-      acc.total += d.avg_gas_fee_eth * d.transaction_count;
-      acc.count += d.transaction_count;
-      return acc;
-    }, { total: 0, count: 0 });
-  
-    const overallAvg = hourlyAverages.count > 0 ? hourlyAverages.total / hourlyAverages.count : 0.005;
-    const sevenDayAvg: { [hour: number]: number } = {};
-    for (let hour = 0; hour < 24; hour++) {
-      sevenDayAvg[hour] = hourlyAverages[hour] && hourlyAverages[hour].count > 0
-        ? hourlyAverages[hour].total / hourlyAverages[hour].count
-        : overallAvg;
-    }
-  
-    const currentFee = sevenDayAvg[currentHour] || overallAvg;
-    const isGoodTime = gasEth < currentFee * 0.9;
-  
-    const predictions: { [hour: number]: number } = {};
-    for (let i = 1; i <= 3; i++) {
-      const hour = (currentHour + i) % 24;
-      predictions[hour] = sevenDayAvg[hour];
-    }
-  
-    const nextBest = Object.entries(predictions).reduce(
-      (best, [hour, fee]) => fee < best.fee ? { hour: parseInt(hour), fee } : best,
-      { hour: (currentHour + 1) % 24, fee: predictions[(currentHour + 1) % 24] }
-    );
-  
-    // --- Gas Fee Trend (last hour) ---
-    const oneHourAgo = Math.floor((now.getTime() - 60 * 60 * 1000) / 1000);
-    const thirtyMinsAgo = Math.floor((now.getTime() - 30 * 60 * 1000) / 1000);
-  
-    const lastHourFees = gasFeeData
-      .filter(d => {
-        const timestamp = Math.floor(new Date(d.event_date).getTime() / 1000);
-        return timestamp >= oneHourAgo && d.transaction_count > 0;
+    // --- Last Hour Fees (current or most recent hour) ---
+    const lastHourFees = timeOfDay
+      .filter((d) => {
+        const isToday = d.event_date === today;
+        const isLastHour = isToday && d.hour_of_day <= currentHour && d.hour_of_day >= currentHour - 1;
+        return isToday && isLastHour && d.transaction_count > 0;
       })
-      .map(d => d.avg_gas_fee_eth)
-      .sort((a, b) => a - b);
+      .map((d) => d.avg_gas_fee_eth);
   
     const avgLastHour = lastHourFees.length > 0
       ? lastHourFees.reduce((sum, fee) => sum + fee, 0) / lastHourFees.length
-      : overallAvg;
+      : 0.0002; // Fallback for no recent data
   
-    const earlyHourFees = gasFeeData
-      .filter(d => {
-        const timestamp = Math.floor(new Date(d.event_date).getTime() / 1000);
-        return timestamp >= oneHourAgo && timestamp < thirtyMinsAgo && d.transaction_count > 0;
+    // --- Trend Direction (last hour vs. previous hour) ---
+    const prevHourFees = timeOfDay
+      .filter((d) => {
+        const isToday = d.event_date === today;
+        const isPrevHour = isToday && d.hour_of_day === currentHour - 1;
+        return isPrevHour && d.transaction_count > 0;
       })
-      .map(d => d.avg_gas_fee_eth);
+      .map((d) => d.avg_gas_fee_eth);
   
-    const earliestLastHour = earlyHourFees.length > 0
-      ? earlyHourFees.reduce((sum, fee) => sum + fee, 0) / earlyHourFees.length
+    const prevHourAvg = prevHourFees.length > 0
+      ? prevHourFees.reduce((sum, fee) => sum + fee, 0) / prevHourFees.length
       : avgLastHour;
   
-    const percentChange = earliestLastHour > 0
-      ? Math.min(((avgLastHour - earliestLastHour) / earliestLastHour * 100), 1000)
-      : 0;
+    const percentChange = prevHourAvg > 0 ? ((avgLastHour - prevHourAvg) / prevHourAvg * 100) : 0;
     const gasTrendDirection = percentChange < -5 ? 'dropping' : percentChange > 5 ? 'rising' : 'stable';
   
-    // --- Pool Metrics Efficiency ---
-    const avgPoolGas = poolMetricsData.reduce((sum, d) => sum + d.median_gas_fee_eth, 0) / poolMetricsData.length;
-    const isEfficient = gasEth < avgPoolGas;
+    // --- Efficiency (last 24 hours of transfers from timeOfDay) ---
+    const oneDayAgo = now.getTime() - 24 * 60 * 60 * 1000;
+    const recentFees = timeOfDay
+      .filter((d) => {
+        const timestamp = new Date(d.event_date).getTime() + d.hour_of_day * 60 * 60 * 1000;
+        return timestamp >= oneDayAgo && d.transaction_count > 0;
+      })
+      .map((d) => d.avg_gas_fee_eth);
+  
+    const avgTransferGasEth = recentFees.length > 0
+      ? recentFees.reduce((sum, fee) => sum + fee, 0) / recentFees.length
+      : 0.0002; // Fallback
+    const isEfficient = gasEth < avgTransferGasEth;
+  
+    // --- Cost Ratio ---
+    const ethPrice = 2000;
+    const amountUsd = transferAmount ? parseFloat(transferAmount) : 0;
+    const gasUsd = gasEth * ethPrice;
+    const gasCostRatio = amountUsd > 0 ? (gasUsd / amountUsd) * 100 : Infinity;
+    const isCostEffective = gasCostRatio < 2;
   
     // --- Suggestions ---
-    const suggestion = isGoodTime && isEfficient
-      ? 'Good time to send now!'
-      : nextBest.fee < currentFee * 0.95
-      ? `Wait until ${nextBest.hour}:00 UTC for lower fees`
-      : 'Fees are steady—send if urgent';
+    const isGoodTime = gasEth < avgLastHour * 1.1;
+    let suggestion = '';
+    if (isGoodTime && isEfficient) {
+      suggestion = `Send now: low gas (${gasEth.toFixed(6)} ETH)${isCostEffective ? ' and cost-effective' : ''}!`;
+    } else if (isGoodTime && gasTrendDirection === 'dropping') {
+      suggestion = `Send soon: gas (${gasEth.toFixed(6)} ETH) is dropping`;
+    } else if (gasEth > avgLastHour * 1.5) {
+      suggestion = `Wait: gas (${gasEth.toFixed(6)} ETH) is high vs. recent avg (${avgLastHour.toFixed(6)} ETH)`;
+    } else if (gasEth > avgLastHour * 1.2) {
+      suggestion = `Consider waiting: gas (${gasEth.toFixed(6)} ETH) is above recent avg (${avgLastHour.toFixed(6)} ETH)`;
+    } else {
+      suggestion = `Fees are ${gasTrendDirection}—send if urgent (${gasEth.toFixed(6)} ETH)`;
+    }
   
     const trend = `Gas fees are ${gasTrendDirection} (last hour: ${avgLastHour.toFixed(6)} ETH)`;
     const efficiency = isEfficient ? 'Efficient gas usage' : 'Higher than average gas';
-    console.log({ gasUnits, gasPriceWei, gasWei, gasEth })
+  
+    console.log('Debug:', {
+      gasEth,
+      currentHour,
+      avgLastHour,
+      lastHourFees: lastHourFees.length,
+      prevHourAvg,
+      avgTransferGasEth,
+      recentFees: recentFees.length,
+      isGoodTime,
+      isEfficient,
+      isCostEffective,
+      gasTrendDirection,
+    });
   
     return {
       gasUnits: gasUnits.toString(),
       gasWei: gasWei.toString(),
-      gasEth, // Add gasEth here
+      gasEth,
       suggestion,
       trend,
       efficiency,
+      gasCostRatio: gasCostRatio.toFixed(2),
     };
   };
 
-    useEffect(() => {
-      if (simulationResult && !simulationResult.error && !simulationResult.txHash) {
-        const steps = ['Fetching gas trends...', 'Analyzing hourly patterns...', 'Generating suggestion...'];
-        setProcessingStep(steps[0]);
-        let stepIndex = 1;
-        const interval = setInterval(() => {
-          if (stepIndex < steps.length) {
-            setProcessingStep(steps[stepIndex]);
-            stepIndex++;
-          } else {
-            setProcessingStep(null);
-            clearInterval(interval);
-          }
-        }, 1000);
-        return () => clearInterval(interval);
-      } else {
-        setProcessingStep(null);
-      }
-    }, [simulationResult]);
+  const getSwapSuggestions = (result: SimulationResult) => {
+    const gasWei = BigInt(result.gasEstimate || '0');
+    const gasPriceWei = BigInt(result.gasPrice || '0');
+    const gasEth = Number(gasWei * gasPriceWei) / 1_000_000_000_000_000_000;
+    const amountInNum = parseFloat(result.amountIn || '0');
+    const amountOutNum = parseFloat(result.amountOut || '0');
+    const slippage = parseFloat(result.slippage?.replace('%', '') || '0');
+  
+    // Gas timing using timeOfDay
+    const currentHour = new Date().getUTCHours();
+    const currentHourData = timeOfDay.find((d) => d.hour_of_day === currentHour);
+    const avgGasFeeEth = currentHourData?.avg_gas_fee_eth || 0;
+    const historicalAvg = timeOfDay.reduce((sum, d) => sum + d.avg_gas_fee_eth, 0) / timeOfDay.length;
+    const isGoodTime = avgGasFeeEth < historicalAvg * 0.9;
+  
+    // Efficiency using gasFeeData
+    const avgSwapGasEth = gasFeeData
+      .filter((d) => d.event_type === 'Swap')
+      .reduce((sum, d) => sum + d.avg_gas_fee_eth, 0) / (gasFeeData.length || 1);
+    const isEfficient = gasEth < avgSwapGasEth;
+  
+    // Gas cost vs. swap value (innovation point)
+    const swapValueDiff = amountOutNum - amountInNum; // Stablecoin profit/loss
+    const gasCostImpact = gasEth / Math.abs(swapValueDiff || 1); // Avoid division by 0
+    const isWorthIt = gasCostImpact < 0.05; // Gas < 5% of swap value change
+  
+    // Pool liquidity trend (innovation point)
+    const pool = poolMetricsData.find((p) => p.pool_address.toLowerCase() === result.tokenIn?.toLowerCase());
+    const liquidityTrend = pool?.tvl_usd > pool?.total_volume_usd * 2 ? 'stable' : 'volatile';
+  
+    // Enhanced suggestion logic
+    let suggestion = '';
+    if (isGoodTime && slippage < 0.5 && isWorthIt) {
+      suggestion = `Swap now: low gas (${gasEth.toFixed(6)} ETH), low slippage (${slippage}%), and cost-effective!`;
+    } else if (isGoodTime && isWorthIt) {
+      suggestion = `Swap now: low gas (${gasEth.toFixed(6)} ETH) and worth it, but slippage is ${slippage}%`;
+    } else if (liquidityTrend === 'volatile') {
+      suggestion = `Wait: pool liquidity is volatile, gas at ${gasEth.toFixed(6)} ETH`;
+    } else {
+      suggestion = `Wait for better conditions: gas (${gasEth.toFixed(6)} ETH) or slippage (${slippage}%) too high`;
+    }
+  
+    return {
+      gasEth: gasEth.toFixed(9),
+      amountOut: amountOutNum.toFixed(3),
+      slippage: slippage.toFixed(2) + '%',
+      suggestion,
+      efficiency: isEfficient ? 'Efficient gas usage' : 'Higher than average gas',
+      liquidityTrend,
+    };
+  };
+
+  useEffect(() => {
+    if (simulationResult && !simulationResult.error && !simulationResult.txHash) {
+      const isSwap = !!simulationResult.amountIn;
+      const steps = isSwap
+        ? ['Fetching pool data...', 'Estimating swap rates...', 'Analyzing gas and slippage...']
+        : ['Fetching gas trends...', 'Analyzing hourly patterns...', 'Generating suggestion...'];
+      setProcessingStep(steps[0]);
+      let stepIndex = 1;
+      const interval = setInterval(() => {
+        if (stepIndex < steps.length) {
+          setProcessingStep(steps[stepIndex]);
+          stepIndex++;
+        } else {
+          setProcessingStep(null);
+          clearInterval(interval);
+        }
+      }, 1000);
+      return () => clearInterval(interval);
+    } else {
+      setProcessingStep(null);
+    }
+  }, [simulationResult]);
 
   const toggleVisibility = () => {
     setIsVisible(!isVisible);
@@ -148,65 +202,82 @@ const SimulationResultBox = ({
 
   if (!simulationResult) return null;
 
+  const isSwap = !!simulationResult.amountIn;
   const explorerUrl = simulationResult?.txHash
   ? `https://${isMainnet ? 'etherscan.io' : 'sepolia.etherscan.io'}/tx/${simulationResult.txHash}`
   : '';
 
-    return (
-      <div className={`${styles.simulationContainer} ${isVisible ? styles.visible : styles.hidden}`}>
-        <button className={styles.arrowToggle} onClick={toggleVisibility}>
-          {isVisible ? '▶' : '◀'}
-        </button>
-        <div
-          className={`${styles.simulationBox} ${isVisible ? styles.boxVisible : styles.boxHidden} ${
-            processingStep ? styles.processing : ''
-          }`}
-        >
-          {simulationResult.error ? (
-            <p>Error: {simulationResult.error}</p>
-          ) : simulationResult.status === 'Sending now' ? (
-            <div className={styles.processingWrapper}>
-              <p>Sending now...</p>
-            </div>
-          ) : simulationResult.txHash ? (
-            <div className={styles.resultContent}>
-              <p>
-                Transaction Hash:{' '}
-                <a href={explorerUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#7bcfff' }}>
-                  {simulationResult.txHash.slice(0, 6)}...{simulationResult.txHash.slice(-4)}
-                </a>
-              </p>
-              <p className={styles.detail}>Add Tx in Mira X Sandbox</p>
-            </div>
-          ) : (
-            <div className={styles.contentWrapper}>
-              {processingStep ? (
-                <div className={styles.processingWrapper}>
-                  <p>Gas Estimate: {simulationResult.gasEstimate} wei</p>
-                  <p className={styles.processingText}>{processingStep}</p>
-                </div>
-              ) : (
-                (() => {
-                  const { gasUnits, gasWei, gasEth, suggestion, trend, efficiency } = getTransferSuggestions(
-                    simulationResult.gasEstimate,
-                    simulationResult.gasPrice
-                  );
-                  return (
-                    <div className={styles.resultContent}>
-                      <p>Gas Units: {gasUnits}</p>
-                      <p>Total Gas Cost: {gasEth.toFixed(9)} ETH</p>
-                      <p className={styles.suggestion}>Mira AI Suggestion: {suggestion}</p>
-                      <p className={styles.detail}>Trend: {trend}</p>
-                      <p className={styles.detail}>Efficiency: {efficiency}</p>
-                    </div>
-                  );
-                })()
-              )}
-            </div>
-          )}
-        </div>
+  return (
+    <div className={`${styles.simulationContainer} ${isVisible ? styles.visible : styles.hidden}`}>
+      <button className={styles.arrowToggle} onClick={toggleVisibility}>
+        {isVisible ? '▶' : '◀'}
+      </button>
+      <div
+        className={`${styles.simulationBox} ${isVisible ? styles.boxVisible : styles.boxHidden} ${
+          processingStep ? styles.processing : ''
+        }`}
+      >
+        {simulationResult.error ? (
+          <p>Error: {simulationResult.error}</p>
+        ) : simulationResult.status === 'Sending now' ? (
+          <div className={styles.processingWrapper}>
+            <p>Sending now...</p>
+          </div>
+        ) : simulationResult.txHash ? (
+          <div className={styles.resultContent}>
+            <p>
+              Transaction Hash:{' '}
+              <a href={explorerUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#7bcfff' }}>
+                {simulationResult.txHash.slice(0, 6)}...{simulationResult.txHash.slice(-4)}
+              </a>
+            </p>
+            <p className={styles.detail}>Add Tx in Mira X Sandbox</p>
+          </div>
+        ) : (
+          <div className={styles.contentWrapper}>
+            {processingStep ? (
+              <div className={styles.processingWrapper}>
+                <p>Gas Estimate: {simulationResult.gasEstimate} wei</p>
+                <p className={styles.processingText}>{processingStep}</p>
+              </div>
+            ) : isSwap ? (
+              (() => {
+                const { gasEth, amountOut, slippage, suggestion, efficiency } = getSwapSuggestions(simulationResult);
+                return (
+                  <div className={styles.resultContent}>
+                    <p>Amount Out: {amountOut} PYUSD</p>
+                    <p>Slippage: {slippage}</p>
+                    <p>Gas Cost: {gasEth} ETH</p>
+                    <p className={styles.suggestion}>Mira AI Suggestion: {suggestion}</p>
+                    <p className={styles.detail}>Efficiency: {efficiency}</p>
+                  </div>
+                );
+              })()
+            ) : (
+              (() => {
+                const { gasUnits, gasWei, gasEth, suggestion, trend, efficiency, gasCostRatio } = getTransferSuggestions(
+                  simulationResult.gasEstimate,
+                  simulationResult.gasPrice,
+                  simulationResult.amount
+
+                );
+                return (
+                  <div className={styles.resultContent}>
+                    <p>Gas Units: {gasUnits}</p>
+                    <p>Total Gas Cost: {gasEth.toFixed(9)} ETH</p>
+                    <p className={styles.suggestion}>Mira AI Suggestion: {suggestion}</p>
+                    <p className={styles.detail}>Trend: {trend}</p>
+                    <p className={styles.detail}>Efficiency: {efficiency}</p>
+                    <p className={styles.detail}>Gas Cost: {gasCostRatio}% of transfer</p>
+                  </div>
+                );
+              })()
+            )}
+          </div>
+        )}
       </div>
-    );
+    </div>
+  );
 };
 
 export default SimulationResultBox;
