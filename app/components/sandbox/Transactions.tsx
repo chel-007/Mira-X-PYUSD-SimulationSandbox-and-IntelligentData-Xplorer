@@ -2,7 +2,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import styles from "../../styles/Transaction.module.css";
+import { FixedSizeList } from 'react-window'; // For virtualized timeline
+import debounce from 'lodash/debounce';
 import { useReactFlow, ReactFlow, Background, Controls, Handle, Position, Node, Edge, applyNodeChanges, applyEdgeChanges, addEdge } from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import { useTransactionTrace } from './useTransactionTrace';
 import LatestTxScroller from './latestTxScroller';
 import { useChainId, useAccount } from 'wagmi';
@@ -13,6 +16,7 @@ import { useData } from '../../utils/DataProvider';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useEthPrice } from "../../utils/EthPriceProvider";
+import { createPortal } from 'react-dom';
 
 
 const gcpProjectId = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT_ID;
@@ -47,7 +51,7 @@ type CustomNode = Node<TransactionNodeData | TextInputNodeData | OptionsNodeData
 // Convert gasUsed (wei) to ETH
 const weiToEth = (gasUsed: string, gasPriceGwei = 20) => {
   const gasUsedDecimal = parseInt(gasUsed, 16);
-  const gasPriceWei = BigInt(gasPriceGwei) * BigInt(10 ** 9); // Gwei to wei
+  const gasPriceWei = BigInt(gasPriceGwei) * BigInt(10 ** 9);
   const costWei = BigInt(gasUsedDecimal) * gasPriceWei;
   const costEth = Number(costWei) / 10 ** 18;
   return costEth.toFixed(6); // 6 decimal places
@@ -75,7 +79,7 @@ const TextInputNode = ({ data, id }: { data: TextInputNodeData; id: string }) =>
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (/^0x[a-fA-F0-9]{64}$/.test(hash)) {
-      console.log(`Submitting TX: ${hash}`);
+      // console.log(`Submitting TX: ${hash}`);
       if (data.onSubmit) data.onSubmit(hash);
     } else {
       toast.error("Please enter a valid transaction hash (0x + 64 hex characters)", {
@@ -123,16 +127,24 @@ const OptionsNode = ({ id, data }: { id: string; data: OptionsNodeData }) => (
   </div>
 );
 
-const CallNode = ({ data }) => {
+
+const CallNode = ({ data, id, selected }) => {
+  const { setNodes, getNodes } = useReactFlow();
+  const [showTooltip, setShowTooltip] = useState(false);
+  
+
   const colors = {
-    pyusd: { bg: 'rgba(0, 102, 204)', border: '#818499' }, // Gold for PYUSD
-    usdc: {bg: '#00A3D6', border: '#007BA7'},
-    uniswap: { bg: '#FF69B4', border: '#FF1493' }, // Pink for Uniswap
-    coinbase: { bg: '#0052FF', border: '#0033CC' }, // Blue for Coinbase
-    kyberswap: { bg: '#31CB9E', border: '#1A8C6B' }, // Green for KyberSwap
-    usdt: { bg: '#26A17B', border: '#1A7559' }, // Teal for USDT
-    mev: { bg: '#FF4500', border: '#CC3700' }, // Red for MEV
-    unknown: { bg: '#333', border: '#fff' }, // Gray for unknowns
+    pyusd: { bg: 'rgba(0, 102, 204)', border: '#818499' },
+    usdc: { bg: '#00A3D6', border: '#007BA7' },
+    uniswap: { bg: '#FF69B4', border: '#FF1493' },
+    coinbase: { bg: '#0052FF', border: '#0033CC' },
+    kyberswap: { bg: '#31CB9E', border: '#1A8C6B' },
+    usdt: { bg: '#26A17B', border: '#1A7559' },
+    inch: { bg: '#7F00FF', border: '#7F00FF' },
+    mev: { bg: '#FF4500', border: '#CC3700' },
+    mimic: { bg: '#bdbcb9', border: '#807f7c' },
+    aave: { bg: '#2EBAC6', border: '#1A7A84' },
+    unknown: { bg: '#333', border: '#fff' },
   };
 
   const getColor = () => {
@@ -144,11 +156,35 @@ const CallNode = ({ data }) => {
     if (name.includes('kyberswap')) return colors.kyberswap;
     if (name === 'usdt') return colors.usdt;
     if (name === 'usdc') return colors.usdc;
+    if (name.includes('1inch')) return colors.inch;
     if (name.includes('mev')) return colors.mev;
-    return colors.unknown; // Fallback
+    if (name.includes('mimic')) return colors.mimic;
+    if (name.includes('aave')) return colors.aave;
+    return colors.unknown;
+  };
+
+  const shortenContractName = (name) => {
+    if (!name) return 'Unknown';
+    if (name === 'Uniswap V3: Nonfungible Position Manager') {
+      return 'Uniswap V3: NFT Pos. Mgr.';
+    }
+    return name;
   };
 
   const { bg, border } = getColor();
+  const isImportant = data.type === 'call' && (data.isKnown || data.isPyusd || data.isError);
+  const totalCalls = getNodes().length + (data.callCount || 0);
+  const useTreeStyle = totalCalls >= 10;
+
+  const toggleCollapse = () => {
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === id ? { ...n, data: { ...n.data, collapsed: !n.data.collapsed } } : n
+      )
+    );
+  };
+
+  const displayContractName = shortenContractName(data.contractName) || (useTreeStyle ? `${data.to.slice(0, 6)}...${data.to.slice(-4)}` : data.to);
 
   return (
     <div
@@ -159,51 +195,87 @@ const CallNode = ({ data }) => {
         color: '#fff',
         position: 'relative',
         border: data.isError ? '2px dashed #FF0000' : `1px solid ${border}`,
+        minWidth: useTreeStyle ? '200px' : undefined,
+        opacity: data.selected ? 1 : 0.7,
+        animation: data.selected ? 'callpulse 1s infinite' : 'none',
+      }}
+      onMouseEnter={() => isImportant && setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      <Handle type="target" position={Position.Top} id="top" style={{ background: '#fff' }} />
+      <Handle type="target" position={Position.Left} id="left" style={{ background: '#fff' }} />
+
+      {useTreeStyle ? (
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+{data.hasSubcalls && (
+  <button
+    onClick={(e) => {
+      e.stopPropagation(); // Prevent click from bubbling up to React Flow
+      toggleCollapse();
+    }}
+    onMouseDown={(e) => e.stopPropagation()} // Prevent mousedown from bubbling up, allowing dragging
+    style={{
+      marginRight: '5px',
+      background: 'none',
+      border: 'none',
+      color: '#fff',
+      fontSize: '14px',
+    }}
+  >
+    {data.collapsed ? '▶' : '▼'}
+  </button>
+)}
+          <strong>{data.type || 'Call'}</strong>
+        </div>
+      ) : (
+        <strong>{data.type || 'Call'}</strong>
+      )}
+      <div>
+        To: {useTreeStyle ? `${data.to.slice(0, 6)}...${data.to.slice(-4)}` : data.to}
+        {useTreeStyle ? null : <br />}
+      </div>
+      <div>Gas Used: {weiToEth(data.gasUsed)} ETH</div>
+      {data.isKnown && data.contractName && (
+        <span style={{ fontSize: '12px' }}>({data.contractName})</span>
+      )}
+      {data.isError && <span style={{ fontSize: '12px', color: '#FF0000' }}>(Failed)</span>}
+      {showTooltip &&
+  createPortal(
+    <div
+      style={{
+        position: 'absolute',
+        top: data.position ? data.position.y - 50 : 0,
+        left: data.position ? data.position.x + 75 : 0,
+        background: '#222',
+        color: '#fff',
+        padding: '5px 10px',
+        borderRadius: '3px',
+        fontSize: '12px',
+        zIndex: 1000,
       }}
     >
-      <Handle type="target" position={Position.Top} style={{ background: '#fff' }} />
-      <strong>{data.type || 'Call'}</strong><br />
-      To: {data.to}<br />
-      Gas Used: {weiToEth(data.gasUsed)} ETH<br />
-      {data.isKnown && data.contractName &&<span style={{ fontSize: '12px' }}> ({data.contractName})</span>}
-      {data.isError && <span style={{ fontSize: '12px', color: '#FF0000' }}> (Failed)</span>}
-      <Handle type="source" position={Position.Bottom} style={{ background: '#fff' }} />
+      {displayContractName}<br />
+      Description: {data.functionDescription || 'No description available'}<br />
+      Value: {weiToEth(data.value)} ETH<br />
+      Input: {data.input.slice(0, 10)}...
+    </div>,
+    document.body
+  )}
+
+      <Handle type="source" position={Position.Bottom} id="bottom" style={{ background: '#fff' }} />
     </div>
   );
 };
 
-
-// const CallNode = ({ data }) => (
-//   <div style={{ background: '#7BCFFF', padding: '10px', borderRadius: '5px', color: '#fff', position: 'relative' }}>
-//     <Handle type="target" position={Position.Top} style={{ background: '#fff' }} />
-//     <strong>Call</strong><br />
-//     To: {data.to}<br />
-//     Gas Used: {weiToEth(data.gasUsed)} ETH<br />
-//     {data.contractName && <span style={{ fontSize: '12px' }}> ({data.contractName})</span>}
-//     <Handle type="source" position={Position.Bottom} style={{ background: '#fff' }} />
-//   </div>
-// );
-
-// const ErrorNode = ({ data }) => (
-//   <div style={{ background: '#FF6347', padding: '10px', borderRadius: '5px', color: '#fff', position: 'relative' }}>
-//     <Handle type="target" position={Position.Top} style={{ background: '#fff' }} />
-//     <strong>Error</strong><br />
-//     To: {data.to}<br />
-//     {data.error}<br />
-//     {data.contractName && <span style={{ fontSize: '12px' }}> ({data.contractName})</span>}
-//     <Handle type="source" position={Position.Bottom} style={{ background: '#fff' }} />
-//   </div>
-// );
-
 const ErrorNode = ({ data }) => {
   const colors = {
-    pyusd: { bg: 'rgba(0, 102, 204)', border: '#FFA500' }, // Gold for PYUSD
-    uniswap: { bg: '#FF69B4', border: '#FF1493' }, // Pink for Uniswap
-    coinbase: { bg: '#0052FF', border: '#0033CC' }, // Blue for Coinbase
-    kyberswap: { bg: '#31CB9E', border: '#1A8C6B' }, // Green for KyberSwap
-    usdt: { bg: '#26A17B', border: '#1A7559' }, // Teal for USDT
-    mev: { bg: '#FF4500', border: '#CC3700' }, // Red for MEV
-    unknown: { bg: '#FF6347', border: '#fff' }, // Tomato red for unknown errors (your original)
+    pyusd: { bg: 'rgba(0, 102, 204)', border: '#FFA500' },
+    uniswap: { bg: '#FF69B4', border: '#FF1493' },
+    coinbase: { bg: '#0052FF', border: '#0033CC' },
+    kyberswap: { bg: '#31CB9E', border: '#1A8C6B' },
+    usdt: { bg: '#26A17B', border: '#1A7559' },
+    mev: { bg: '#FF4500', border: '#CC3700' },
+    unknown: { bg: '#FF6347', border: '#fff' },
   };
 
   const getColor = () => {
@@ -215,7 +287,7 @@ const ErrorNode = ({ data }) => {
     if (name.includes('kyberswap')) return colors.kyberswap;
     if (name === 'usdt') return colors.usdt;
     if (name.includes('mev')) return colors.mev;
-    return colors.unknown; // Fallback to your red for unknown errors
+    return colors.unknown;
   };
 
   const { bg, border } = getColor();
@@ -245,11 +317,26 @@ const ErrorNode = ({ data }) => {
 
 const SummaryNode = ({ data }) => {
   const contractNames = {
+    '0x3c11f6265ddec22f4d049dde480615735f451646': 'Mimic Swapper',
     '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48': 'USDC',
     '0xdac17f958d2ee523a2206206994597c13d831ec7': 'USDT',
     '0x264bd8291fae1d75db2c5f573b07faa6715997b5': 'Paxos 4',
     '0x6c3ea9036406852006290770bedfcaba0e23a0e8': 'PYUSD',
     '0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43': 'Coinbase 10',
+    '0x7a250d5630b4cf539739df2c5dacb4c659f2488d': 'Uniswap V2 Router',
+    '0xa7ca2c8673bcfa5a26d8ceec2887f2cc2b0db22a': 'Uniswap V3: NFT Pos Mgr.',
+    '0x1111111254eeb25477b68fb85ed929f73a960582': '1inch v5: Router',
+    '0xe592427a0aece92de3edee1f18e0157c05861564': 'Uniswap V3 Router',
+    '0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45': 'Uniswap Universal Router',
+    '0xc30c8b862f7de6ba5d7eaeb113c78ec6b5ded04b': 'Uniswap V3: Swap Router 02',
+    '0xdef1c0ded9bec7f1a1670819833240f027b25eff': '0x Exchange Proxy',
+    '0x9008d19f58aabd9ed0d60971565aa8510560ab41': 'KyberSwap',
+    '0x3e88c9b0e3be6817973a6e629211e702d12c577f': 'Aave: Pool V3',
+    '0x00000000000000adc04c56bf30ac9d3c0aaf14dc': 'Seaport (OpenSea)',
+    '0x0000000000a39bb272e79075ade125fd351887ac': 'Blur Pool',
+    '0x00000000009E50a7dDb7a7B0e2ee6604fd120E49': 'MEV Bot (Common on Curve Swaps)',
+    '0x000000000000000000000000000000000000dead': 'MEV Bot (Burner)',
+    '0x0000000000007f150bd6f54c40a34d7c3d5e9f56': 'MEV Bot (Common)',
   };
 
   const formatAddress = (addr) => {
@@ -369,10 +456,10 @@ const SelectorNode = ({ data, id }) => {
   useEffect(() => {
     // Set initial selection
     if (data.onSelect) {
-      const inputToken = data.options[0].split(' to ')[0]; // "USDT"
-      data.onSelect(data.options[0]); // Trigger onSelect with first option
+      const inputToken = data.options[0].split(' to ')[0];
+      data.onSelect(data.options[0]);
     }
-  }, []); // Run once on mount
+  }, []);
 
   const handleChange = (e) => {
     const value = e.target.value;
@@ -397,20 +484,116 @@ const SelectorNode = ({ data, id }) => {
 };
 
 
-const parseTrace = (trace, parentId, position, contractNames = {}) => {
+// const parseTrace = (trace, parentId, position, contractNames = {}) => {
+//   if (!trace || typeof trace !== 'object') {
+//     // console.error('Invalid trace data:', trace);
+//     return { nodes: [], edges: [], callCount: 0, errorCount: 0 };
+//   }
+
+//   const nodes = [];
+//   const edges = [];
+//   const nodeId = `${parentId}-${trace.type || 'call'}-${Math.random().toString(36).substr(2, 5)}`;
+
+//   const toLower = trace.to?.toLowerCase();
+//   const isPyusd = toLower === PYUSD_MAINNET_ADDRESS
+//   const isError = trace.error || trace.revertReason;
+//   const contractName = contractNames[toLower] || null;
+
+//   nodes.push({
+//     id: nodeId,
+//     type: isError ? 'errorNode' : 'callNode',
+//     data: {
+//       to: trace.to || 'Unknown',
+//       gasUsed: trace.gasUsed || '0',
+//       value: trace.value || '0', // Include for tooltips (ETH or token amounts)
+//       input: trace.input || '', // For decoding swaps, approvals, etc.
+//       error: isError ? (trace.error || trace.revertReason) : null,
+//       contractName,
+//       isPyusd,
+//       isKnown: !!contractNames[toLower], // True if in contractNames
+//       type: trace.type || 'call', // Keep call type (call, staticcall, etc.)
+//     },
+//     position: { x: position.x, y: position.y },
+//   });
+
+//   if (trace.calls && Array.isArray(trace.calls) && trace.calls.length > 0) {
+//     trace.calls.forEach((subcall, index) => {
+//       const subPosition = { x: position.x + 200, y: position.y + 180 * (index + 1) };
+//       const { nodes: subNodes, edges: subEdges } = parseTrace(subcall, nodeId, subPosition, contractNames);
+//       nodes.push(...subNodes);
+//       edges.push(...subEdges);
+//       edges.push({
+//         id: `e${nodeId}-${subNodes[0].id}`,
+//         source: nodeId,
+//         target: subNodes[0].id,
+//         animated: true,
+//       });
+//     });
+//   }
+
+//   return {
+//     nodes,
+//     edges,
+//     callCount: nodes.length,
+//     errorCount: nodes.filter((n) => n.type === 'errorNode').length,
+//   };
+// };
+
+const generateColors = () => {
+  const colors = [];
+  for (let i = 0; i < 100; i++) {
+    const hue = Math.floor(Math.random() * 360);
+    const saturation = 70 + Math.random() * 30; // 70-100%
+    const lightness = 40 + Math.random() * 20; // 40-60%
+    colors.push(`hsl(${hue}, ${saturation}%, ${lightness}%)`);
+  }
+  return colors;
+};
+const callColors = generateColors();
+const defaultColor = '#818499';
+
+// Add callIndex to track unique calls
+const parseTrace = (trace, parentId, position, contractNames = {}, depth = 0, totalCallCount = null, callIndex = 0) => {
   if (!trace || typeof trace !== 'object') {
-    console.error('Invalid trace data:', trace);
-    return { nodes: [], edges: [], callCount: 0, errorCount: 0 };
+    return { nodes: [], edges: [], callCount: 0, errorCount: 0, nextCallIndex: callIndex };
   }
 
   const nodes = [];
   const edges = [];
-  const nodeId = `${parentId}-${trace.type || 'call'}-${Math.random().toString(36).substr(2, 5)}`;
+  const nodeId = `${parentId || 'root'}-${trace.type || 'call'}-${Math.random().toString(36).substr(2, 5)}`;
+
+  const shortenContractName = (name) => {
+    if (!name) return null;
+    if (name === 'Uniswap V3: Nonfungible Position Manager') {
+      return 'Uniswap V3: NFT Pos. Mgr.';
+    }
+    if (name === '1inch v5: Aggregation Router') {
+      return '1inch v5 Router';
+    }
+    if (name === 'Uniswap V3: Swap Router 02') {
+      return 'Uniswap V3: Swap Router';
+    }
+    return name;
+  };
 
   const toLower = trace.to?.toLowerCase();
-  const isPyusd = toLower === PYUSD_MAINNET_ADDRESS
+  const isPyusd = toLower === PYUSD_MAINNET_ADDRESS;
   const isError = trace.error || trace.revertReason;
-  const contractName = contractNames[toLower] || null;
+  const contractName = shortenContractName(contractNames[toLower] || null);
+  const hasSubcalls = trace.calls && Array.isArray(trace.calls) && trace.calls.length > 0;
+
+  if (totalCallCount === null) {
+    const countSubcalls = (t) => {
+      let count = 1;
+      if (t.calls && Array.isArray(t.calls)) {
+        t.calls.forEach((sub) => (count += countSubcalls(sub)));
+      }
+      return count;
+    };
+    totalCallCount = countSubcalls(trace);
+  }
+
+  const useTreeStyle = totalCallCount >= 10;
 
   nodes.push({
     id: nodeId,
@@ -418,29 +601,79 @@ const parseTrace = (trace, parentId, position, contractNames = {}) => {
     data: {
       to: trace.to || 'Unknown',
       gasUsed: trace.gasUsed || '0',
-      value: trace.value || '0', // Include for tooltips (ETH or token amounts)
-      input: trace.input || '', // For decoding swaps, approvals, etc.
+      value: trace.value || '0',
+      input: trace.input || '',
       error: isError ? (trace.error || trace.revertReason) : null,
       contractName,
       isPyusd,
-      isKnown: !!contractNames[toLower], // True if in contractNames
-      type: trace.type || 'call', // Keep call type (call, staticcall, etc.)
+      isKnown: !!contractNames[toLower],
+      type: trace.type || 'call',
+      collapsed: hasSubcalls && useTreeStyle,
+      hasSubcalls,
+      callCount: totalCallCount,
+      callDepthColor: callColors[callIndex % 100] || defaultColor,
+      parentId: depth === 0 ? null : parentId,
     },
-    position: { x: position.x, y: position.y },
+    position: {
+      x: useTreeStyle ? position.x + depth * 250 : position.x + 200,
+      y: useTreeStyle ? position.y : position.y,
+    },
   });
 
-  if (trace.calls && Array.isArray(trace.calls) && trace.calls.length > 0) {
+  let nextCallIndex = callIndex + 1;
+  if (hasSubcalls) {
+    let subcallY = position.y + (useTreeStyle ? 100 : 180);
     trace.calls.forEach((subcall, index) => {
-      const subPosition = { x: position.x + 200, y: position.y + 180 * (index + 1) };
-      const { nodes: subNodes, edges: subEdges } = parseTrace(subcall, nodeId, subPosition, contractNames);
+      const subPosition = {
+        x: useTreeStyle ? position.x : position.x + 200,
+        y: subcallY,
+      };
+      const { nodes: subNodes, edges: subEdges, nextCallIndex: updatedIndex } = parseTrace(
+        subcall,
+        nodeId,
+        subPosition,
+        contractNames,
+        depth + 1,
+        totalCallCount,
+        nextCallIndex
+      );
       nodes.push(...subNodes);
       edges.push(...subEdges);
+
+      // Determine which handles to use for the edge
+      const parentNode = nodes.find(n => n.id === nodeId);
+      const childNode = subNodes[0];
+      let sourceHandle = 'bottom';
+      let targetHandle = 'top';
+
+      if (useTreeStyle) {
+        // If child is to the right (tree style), connect bottom-to-left
+        if (childNode.position.x > parentNode.position.x) {
+          targetHandle = 'left';
+        }
+        // If child is directly below (same x), connect bottom-to-top (already set)
+      }
+
+      // Define edge style based on useTreeStyle
+      const edgeStyle = useTreeStyle
+        ? { stroke: '#fff', strokeWidth: 2, opacity: '0.6' } // Thicker white stroke for tree style
+        : { stroke: '#555', strokeWidth: 1 }; // Default for non-tree style
+
+      const edgeType = useTreeStyle ? 'smoothstep' : 'default'; // Smoothstep for tree style, default otherwise
+
       edges.push({
         id: `e${nodeId}-${subNodes[0].id}`,
         source: nodeId,
         target: subNodes[0].id,
+        sourceHandle,
+        targetHandle,
         animated: true,
+        style: edgeStyle,
+        type: edgeType,
       });
+
+      subcallY += useTreeStyle ? 120 : 180 * (index + 1);
+      nextCallIndex = updatedIndex;
     });
   }
 
@@ -449,10 +682,9 @@ const parseTrace = (trace, parentId, position, contractNames = {}) => {
     edges,
     callCount: nodes.length,
     errorCount: nodes.filter((n) => n.type === 'errorNode').length,
+    nextCallIndex,
   };
 };
-
-
 // Parse trace data
 // const parseTrace = (trace, parentId, position, contractNames = {}) => {
 //   // console.log('Parsing Trace:', trace);
@@ -509,7 +741,6 @@ const InputNode = ({ data, id }) => {
   const isReadOnly = data.readOnly || (isAmountOut && !!simulationResult?.amountOut);
 
   useEffect(() => {
-    // Set value from data.value initially or simulationResult.amountOut if applicable
     if (isAmountOut && simulationResult?.amountOut) {
       setValue(simulationResult.amountOut);
     } else {
@@ -598,7 +829,6 @@ const MockButtonNode = ({ data, id }) => {
 
   const handleMock = async () => {
     if (errorState) {
-      // On "Restart" click, clear the flow (passed from Transactions.tsx)
       data.clearFlow();
       setErrorState(false);
       setIsSimulated(false); // Reset for new simulation
@@ -650,14 +880,13 @@ const MockButtonNode = ({ data, id }) => {
       try {
         if (!isSimulated) {
           const result = await simulateTransfer(From, To, String(Amount), data.isMainnet);
-          console.log('Transfer Simulation Result:', result);
+          // console.log('Transfer Simulation Result:', result);
           setSimulationResult(result);
           setIsSimulated(true); // Switch to Send mode
         } else {
-          // Send
-          setSimulationResult({ status: 'Sending now' }); // Temp state for SimulationResultBox
+          setSimulationResult({ status: 'Sending now' });
           const { txHash } = await sendTransfer(To, String(Amount), data.isMainnet);
-          setSimulationResult({ txHash, status: 'Sent' }); // Update with txHash
+          setSimulationResult({ txHash, status: 'Sent' });
           toast.success('Transfer successful!', { position: 'top-right' });
           setErrorState(true);
         }
@@ -710,33 +939,52 @@ const nodeTypes = {
   table: TableNode,
   traceContainer: TraceContainerNode,
   mockButton: MockButtonNode,
-  selector: SelectorNode, // Add this
+  selector: SelectorNode,
 };
 
-const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, setEdges: any, nodes: CustomNode[], edges: Edge[] }) => {
+interface TransactionsProps {
+  setNodes: React.Dispatch<React.SetStateAction<CustomNode[]>>;
+  setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
+  nodes: CustomNode[];
+  edges: Edge[];
+  setActiveTabMain: (tab: 'transactions' | 'wallets') => void;
+  mockAddress: string | null;
+  setMockAddress: React.Dispatch<React.SetStateAction<string | null>>;
+}
+
+const Transactions = ({ setNodes, setEdges, nodes, edges, setActiveTabMain, mockAddress, setMockAddress }: TransactionsProps ) => {
   const chainId = useChainId();
   const isMainnet = chainId === 1; // Single source of truth
   const isSepolia = chainId === 11155111;
-  const rpcUrlRef = useRef(isMainnet ? MAINNET_RPC_URL : SEPOLIA_RPC_URL); // Ref for RPC
+  const rpcUrlRef = useRef(isMainnet ? MAINNET_RPC_URL : SEPOLIA_RPC_URL);
   const { address } = useAccount();
   const isWalletConnected = !!address;
   const { trace, receipt, loading, error, resetTrace, fetchTrace } = useTransactionTrace();
-  const { setSimulationResult, clearSimulation } = useSimulation(); // Keep other context funcs
+  const { setSimulationResult, clearSimulation } = useSimulation();
   const [fetchingNodeId, setFetchingNodeId] = useState(null);
-  const { setCenter } = useReactFlow();
+  // const { setCenter } = useReactFlow();
+  const { setCenter, fitView, setViewport } = useReactFlow();
   const { timeOfDay, gasFeeData, poolMetricsData } = useData();
   const { ethPrice, loading: ethPriceLoading } = useEthPrice();
   const [mockInputs, setMockInputs] = useState({});
   const [amountNodeId, setAmountNodeId] = useState(null);
   const [timeline, setTimeline] = useState([]);
-  const [isTimelineOpen, setIsTimelineOpen] = useState(true);
+  const [isSidePanelOpen, setIsSidePanelOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState('timeline');
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [selectedNodeId, setSelectedNodeId] = useState(null);
+  const [mevAnalysis, setMevAnalysis] = useState({ ran: false, results: [] });
+
+  const debouncedSetNodes = debounce(setNodes, 100);
+  const debouncedSetTimeline = debounce(setTimeline, 100);
+  
 
   // Single useEffect for network updates
   useEffect(() => {
-    console.log("chainId changed to:", chainId);
+    // console.log("chainId changed to:", chainId);
     const newIsMainnet = chainId === 1;
     rpcUrlRef.current = newIsMainnet ? MAINNET_RPC_URL : SEPOLIA_RPC_URL;
-    console.log("Transactions isMainnet:", newIsMainnet, "RPC:", rpcUrlRef.current);
+    // console.log("Transactions isMainnet:", newIsMainnet, "RPC:", rpcUrlRef.current);
 
     // Toast notification for network change
     toast.info(`Connected network changed! ${newIsMainnet ? 'Mainnet' : isSepolia ? 'Sepolia' : 'Unknown'}`, {
@@ -747,14 +995,14 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
       pauseOnHover: true,
       draggable: true,
     });
-  }, [chainId, isSepolia]); // Depend only on chainId
+  }, [chainId, isSepolia]);
 
   const clearFlow = () => {
     setNodes([]);
     setEdges([]);
     setMockInputs({});
     setTimeline([]);
-    setAmountNodeId(null); // Clear amountNodeId
+    setAmountNodeId(null);
     setFetchingNodeId(null);
     if (typeof resetTrace === 'function' || typeof clearSimulation === 'function') {
       resetTrace();
@@ -762,6 +1010,11 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
     } else {
       console.error('resetTrace is not a function:', resetTrace);
     }
+    // Reset zoom and pan
+    setTimeout(() => {
+
+      setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 200 });
+    }, 0);
   };
 
 
@@ -891,7 +1144,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
   }, [mockInputs, amountNodeId, setNodes, setEdges, isMainnet, rpcUrlRef, timeOfDay, isWalletConnected, ethPrice, nodes, clearFlow]);
 
   const addInitialOptionsNode = (x, y) => {
-    console.log("inside add", isMainnet)
+    // console.log("inside add", isMainnet)
     const newNode = {
       id: `${Date.now()}`,
       type: 'options',
@@ -929,7 +1182,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
                             onSubmit: (hash) => {
                               setTimeline([]);
                               resetTrace();
-                              console.log("Submitting hash:", hash, "with RPC:", rpcUrlRef.current);
+                              // console.log("Submitting hash:", hash, "with RPC:", rpcUrlRef.current);
                               setFetchingNodeId(newId);
                               // Clear previous result nodes and edges
                               setNodes((nds) => {
@@ -938,13 +1191,13 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
                                   'callNode',
                                   'summaryNode',
                                   'digDeeper',
-                                  'options', // If spawned by digDeeper
+                                  'options',
                                   'inspect',
                                   'table',
-                                  'textInput' // Nested textInput from Cross Examine
+                                  'textInput'
                                 ];
                                 const nodesToKeep = nds.filter((n) => 
-                                  !resultNodeTypes.includes(n.type) || n.id === newId // Keep the current input node
+                                  !resultNodeTypes.includes(n.type) || n.id === newId
                                 );
                                 return nodesToKeep;
                               });
@@ -968,18 +1221,9 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
                                   );
                                 });
                               });
-                              console.log("fetchTrace called");
+                              // console.log("fetchTrace called");
                               resetTrace(); // Clear trace/receipt
                               fetchTrace(hash, rpcUrlRef.current);
-                              if (receipt && trace) {
-                                if (isPyusdTransaction(receipt, trace, isMainnet)) {
-                                  console.log("Valid PYUSD transaction");
-                                } else {
-                                  toast.error("This transaction does not involve PYUSD. Please enter a PYUSD-related TX.");
-                                  resetTrace();
-                                  setFetchingNodeId(null);
-                                }
-                              } 
                             },
                           },
                           position: { x: position.x + 200, y: position.y + 100 },
@@ -1019,7 +1263,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
                                           label: input.label,
                                           options: input.options,
                                           onSelect: (value) => {
-                                            const inputToken = value.split(' to ')[0]; // e.g., "USDT"
+                                            const inputToken = value.split(' to ')[0];
                                             setMockInputs((prev) => ({ ...prev, inputToken }));
                                           },
                                         },
@@ -1127,11 +1371,10 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
     setNodes((nds) => [...nds, newNode]);
   };
 
-  const PYUSD_ADDRESS = '0x6c3ea9036406852006290770bedfcaba0e23a0e8'.toLowerCase();
 
   useEffect(() => {
     if (trace && receipt && fetchingNodeId) {
-      console.log("Processing trace/receipt for node:", fetchingNodeId);
+      // console.log("Processing trace/receipt for node:", fetchingNodeId);
       handleDataFetched(fetchingNodeId, trace, receipt);
       setFetchingNodeId(null);
     }
@@ -1154,11 +1397,13 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
     if (!isPyusdTransaction(receipt, trace, isMainnet)) {
       toast.error("Only PYUSD transactions are supported. Please enter a PYUSD-related TX.");
       resetTrace();
-      return; // Exit early, no nodes added
+      return; // Exit early
     }
     // console.log("Valid PYUSD transaction");
 
-    setTimeline([]);
+    // setTimeline([]);
+
+    debouncedSetTimeline([]);
 
     const parentNode = nodes.find((n) => edges.some((e) => e.target === nodeId && e.source === n.id));
     if (!parentNode) {
@@ -1167,21 +1412,24 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
     }
   
     const contractNames = {
+      '0x3c11f6265ddec22f4d049dde480615735f451646': 'Mimic Swapper',
       '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48': 'USDC',
       '0xdac17f958d2ee523a2206206994597c13d831ec7': 'USDT',
       '0x264bd8291fae1d75db2c5f573b07faa6715997b5': 'Paxos 4',
       '0x6c3ea9036406852006290770bedfcaba0e23a0e8': 'PYUSD',
       '0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43': 'Coinbase 10',
-      // Expanded known contracts
       '0x7a250d5630b4cf539739df2c5dacb4c659f2488d': 'Uniswap V2 Router',
-      '0x1111111254eeb25477b68fb85ed929f73a960582': '1inch V5',
+      '0xa7ca2c8673bcfa5a26d8ceec2887f2cc2b0db22a': 'Uniswap V3: Nonfungible Position Manager',
+      '0x1111111254eeb25477b68fb85ed929f73a960582': '1inch v5: Aggregation Router',
       '0xe592427a0aece92de3edee1f18e0157c05861564': 'Uniswap V3 Router',
       '0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45': 'Uniswap Universal Router',
+      '0xc30c8b862f7de6ba5d7eaeb113c78ec6b5ded04b': 'Uniswap V3: Swap Router 02',
       '0xdef1c0ded9bec7f1a1670819833240f027b25eff': '0x Exchange Proxy',
       '0x9008d19f58aabd9ed0d60971565aa8510560ab41': 'KyberSwap',
-      '0x00000000000000adc04c56bf30ac9d3c0aaf14dc': 'Seaport (OpenSea)', // Example marketplace
-      '0x0000000000a39bb272e79075ade125fd351887ac': 'Blur Pool', // NFT-related
-      // MEV Bots (example addresses - adjust based on known patterns)
+      '0x3e88c9b0e3be6817973a6e629211e702d12c577f': 'Aave: Pool V3',
+      '0x00000000000000adc04c56bf30ac9d3c0aaf14dc': 'Seaport (OpenSea)',
+      '0x0000000000a39bb272e79075ade125fd351887ac': 'Blur Pool',
+      '0x00000000009E50a7dDb7a7B0e2ee6604fd120E49': 'MEV Bot (Common on Curve Swaps)',
       '0x000000000000000000000000000000000000dead': 'MEV Bot (Burner)',
       '0x0000000000007f150bd6f54c40a34d7c3d5e9f56': 'MEV Bot (Common)',
     };
@@ -1190,7 +1438,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
   const { nodes: traceNodes, edges: traceEdges, callCount, errorCount } = parseTrace(trace, nodeId, startPosition, contractNames);
 
   if (traceNodes.length === 0) {
-    console.error('No trace nodes generated');
+    // console.error('No trace nodes generated');
     return;
   }
 
@@ -1227,9 +1475,9 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
     traceNodes.forEach((node, index) => {
       const { to, contractName, type, isError } = node.data;
       const address = to?.toLowerCase();
-      console.log("address", address)
-      const label = contractName || (to && typeof to === 'string' ? `${to.slice(0, 6)}...${to.slice(-4)}` : 'Unknown');
-      console.log("label", label)
+      // console.log("address", address)
+      const label = contractName || (to && typeof to === 'string' ? `${to.slice(0, 3)}...${to.slice(-3)}` : 'Unknown');
+      // console.log("label", label)
       if (address === lastAddress && type === lastType && !isError) {
         timelineData.push({ id: node.id, isDot: true });
       } else {
@@ -1244,7 +1492,6 @@ const Transactions = ({ setNodes, setEdges, nodes, edges }: { setNodes: any, set
         lastType = type;
       }
     });
-    setTimeline(timelineData);
 
 // Find the deepest y position among all trace nodes
 const deepestNode = traceNodes.reduce((deepest, node) => 
@@ -1258,12 +1505,11 @@ const summaryNode = {
   position: { x: deepestNode.position.x + 50, y: deepestNode.position.y + (deepestNode.style?.height || 100) + 40 }, // Below deepest node
 };
 
-// Calculate container bounds including all nodes
-const allNodes = [...traceNodes, summaryNode];
-const containerLeft = Math.min(...allNodes.map((n) => n.position.x)) - 20;
-const containerRight = Math.max(...allNodes.map((n) => n.position.x + (n.style?.width || 200))) + 150;
-const containerTop = Math.min(...allNodes.map((n) => n.position.y)) - 50;
-const containerBottom = Math.max(...allNodes.map((n) => n.position.y + (n.style?.height || 100))) + 100;
+const allNodesBeforeFilter = [...traceNodes, summaryNode];
+const containerLeft = Math.min(...allNodesBeforeFilter.map((n) => n.position.x)) - 20;
+const containerRight = Math.max(...allNodesBeforeFilter.map((n) => n.position.x + (n.style?.width || 200))) + 150;
+const containerTop = Math.min(...allNodesBeforeFilter.map((n) => n.position.y)) - 50;
+const containerBottom = Math.max(...allNodesBeforeFilter.map((n) => n.position.y + (n.style?.height || 100))) + 100;
 const containerWidth = containerRight - containerLeft;
 const containerHeight = containerBottom - containerTop;
 
@@ -1282,138 +1528,32 @@ const containerNode = {
       type: 'digDeeper',
       data: {
         onDigDeeper: (digDeeperId: string) => {
-          // Find existing InspectNode connected from DigDeeperNode
-          const existingInspectNode = nodes.find((n) => 
-            n.type === 'inspect' && edges.some((e) => e.source === digDeeperId && e.target === n.id)
-          );
-    
-          if (existingInspectNode) {
-            // Collect all nodes to remove: InspectNode and its descendants
-            const nodesToRemove = [existingInspectNode.id];
-            const collectChildren = (parentId) => {
-              const children = nodes.filter((n) => 
-                edges.some((e) => e.source === parentId && e.target === n.id)
-              );
-              children.forEach((child) => {
-                nodesToRemove.push(child.id);
-                collectChildren(child.id); // Recursively collect nested children
-              });
-            };
-            collectChildren(existingInspectNode.id);
-    
-            // Remove all related nodes and edges
-            setNodes((nds) => nds.filter((n) => !nodesToRemove.includes(n.id)));
-            setEdges((eds) => eds.filter((e) => 
-              !nodesToRemove.includes(e.source) && !nodesToRemove.includes(e.target)
-            ));
-          }
-    
-          // Check for existing OptionsNode
-          const existingOptionsNode = nodes.find((n) => 
+          const existingOptionsNode = nodes.find((n) =>
             n.type === 'options' && edges.some((e) => e.source === digDeeperId && e.target === n.id)
           );
-          if (existingOptionsNode) return; // Do nothing if OptionsNode already exists
-    
-          // Add fresh OptionsNode
+          if (existingOptionsNode) return;
+  
           const optionsNodeId = `${digDeeperId}-options`;
           const optionsPosition = { x: digDeeperNode.position.x + 150, y: digDeeperNode.position.y - 20 };
           const optionsNode = {
             id: optionsNodeId,
             type: 'options',
             data: {
-              options: ['Balances Of', 'Last Transacts', 'Cross Examine'],
+              options: ['Mock Address'],
               onSelect: (optId: string, selectedOption: string) => {
-                const inspectNodeId = `${Date.now()}-inspect`;
-                const inspectNode = {
-                  id: inspectNodeId,
-                  type: 'inspect',
-                  data: { option: selectedOption, loading: selectedOption !== 'Cross Examine' },
-                  position: optionsPosition, // Replace OptionsNode position
-                };
-    
-                // Replace OptionsNode with InspectNode
-                setNodes((nds) => [
-                  ...nds.filter((n) => n.id !== optId),
-                  inspectNode,
-                ]);
-                setEdges((eds) => [
-                  ...eds.filter((e) => e.target !== optId),
-                  { id: `e${digDeeperId}-${inspectNodeId}`, source: digDeeperId, target: inspectNodeId, animated: true },
-                ]);
-    
-                if (selectedOption === 'Cross Examine') {
-                  const textInputNodeId = `${Date.now()}-cross-input`;
-                  const textInputNode = {
-                    id: textInputNodeId,
-                    type: 'textInput',
-                    data: {
-                      label: 'Enter Address to Cross Examine',
-                      onSubmit: (address: string) => {
-                        setNodes((nds) => nds.map((n) => 
-                          n.id === inspectNodeId ? { ...n, data: { ...n.data, loading: true } } : n
-                        ));
-                        setTimeout(() => {
-                          const resultNodeId = `${Date.now()}-result`;
-                          const resultNode = {
-                            id: resultNodeId,
-                            type: 'table',
-                            data: {
-                              title: 'Cross Examine Results',
-                              content: [`Address 1 interacted with ${address.slice(0, 8)}... 2 times: TX1, TX2`],
-                            },
-                            position: { x: inspectNode.position.x + 150, y: inspectNode.position.y },
-                          };
-                          setNodes((nds) => [
-                            ...nds.filter((n) => n.id !== textInputNodeId),
-                            resultNode,
-                          ].map((n) => 
-                            n.id === inspectNodeId ? { ...n, data: { ...n.data, loading: false } } : n
-                          ));
-                          setEdges((eds) => [
-                            ...eds.filter((e) => e.target !== textInputNodeId),
-                            { id: `e${inspectNodeId}-${resultNodeId}`, source: inspectNodeId, target: resultNodeId, animated: true },
-                          ]);
-                        }, 2000); // Simulate fetch
-                      },
-                    },
-                    position: { x: inspectNode.position.x + 150, y: inspectNode.position.y },
-                  };
-                  setNodes((nds) => [...nds, textInputNode]);
-                  setEdges((eds) => [
-                    ...eds,
-                    { id: `e${inspectNodeId}-${textInputNodeId}`, source: inspectNodeId, target: textInputNodeId, animated: true },
-                  ]);
-                } else {
+                setNodes((nds) => nds.filter((n) => n.id !== optId));
+                setEdges((eds) => eds.filter((e) => e.target !== optId));
+  
+                if (selectedOption === 'Mock Address') {
                   setTimeout(() => {
-                    const resultNodeId = `${Date.now()}-result`;
-                    const resultNode = {
-                      id: resultNodeId,
-                      type: 'table',
-                      data: {
-                        title: `${selectedOption} Results`,
-                        content: selectedOption === 'Balances Of' 
-                          ? ['Address 1: 1000 PYUSD', 'Address 2: 500 PYUSD']
-                          : ['Address 1: TX1, TX2, TX3', 'Address 2: TX4, TX5'],
-                      },
-                      position: { x: inspectNode.position.x + 150, y: inspectNode.position.y },
-                    };
-                    setNodes((nds) => [
-                      ...nds.map((n) => 
-                        n.id === inspectNodeId ? { ...n, data: { ...n.data, loading: false } } : n
-                      ),
-                      resultNode,
-                    ]);
-                    setEdges((eds) => [
-                      ...eds,
-                      { id: `e${inspectNodeId}-${resultNodeId}`, source: inspectNodeId, target: resultNodeId, animated: true },
-                    ]);
-                  }, 2000); // Simulate fetch
-                }
+                    setActiveTabMain('wallets');
+                    setMockAddress(from);
+                  }, 2000);
+                } 
               },
             },
             position: optionsPosition,
           };
-    
           setNodes((nds) => [...nds, optionsNode]);
           setEdges((eds) => [
             ...eds,
@@ -1424,36 +1564,98 @@ const containerNode = {
       position: { x: containerNode.position.x + containerWidth + 50, y: containerNode.position.y + containerHeight / 2 - 40 },
     };
   
-    setNodes((nds) => {
-      const updatedNodes = [...nds, containerNode, ...traceNodes, summaryNode, digDeeperNode];
+debouncedSetTimeline(timelineData);
+debouncedSetNodes((nds) => {
+  const updatedNodes = [...nds, containerNode, ...traceNodes, summaryNode, digDeeperNode];
+  return updatedNodes;
+});
+setEdges((eds) => {
+  const updatedEdges = [...eds, ...traceEdges];
+  return updatedEdges;
+});
+    setTimeout(() => {
+      const endX = summaryNode.position.x + (summaryNode.style?.width || 200) / 2;
+      const endY = summaryNode.position.y + (summaryNode.style?.height || 100) / 2;
+      setCenter(endX, endY, { zoom: 1.0, duration: 500 });
+    }, 100);
+  };
+  
 
-      setTimeout(() => {
-        const endX = summaryNode.position.x + (summaryNode.style?.width || 200) / 2;
-        const endY = summaryNode.position.y + (summaryNode.style?.height || 100) / 2;
-        setCenter(endX, endY, { zoom: 1.0, duration: 500 }); // Direct pan, 500ms
-      }, 100);
-
-      return updatedNodes;
-      });
-    setEdges((eds) => {
-      const updatedEdges = [...eds, ...traceEdges];
-      // console.log('Updated Edges:', updatedEdges);
-      return updatedEdges;
-    });
+  const TimelineRow = ({ index, style }) => {
+    const step = timeline[index];
+    const is1inchV5 = step.label?.includes('1inch V5');
+    const isUsdt = step.label?.includes('USDT');
+    const isUsdc = step.label?.includes('USDC');
+    const isUniswap = step.label?.includes('uniswap');
+    const isCoinbase = step.label?.includes('coinbase');
+    const isKyberswap = step.label?.includes('kyberswap');
+    const isMev = step.label?.includes('mev');
+    return (
+      <div
+        style={{
+          ...style,
+          cursor: 'pointer',
+          color: is1inchV5 ? '#9B59B6' : isUsdt ? '#26A17B': isUsdc ? '#FF69B4': isUniswap ? '#FF69B4': isCoinbase ? '#0052FF': isKyberswap ? '#31CB9E': isMev ? '#FF4500':
+          step.isPyusd ? 'rgba(0, 102, 204)' : step.isKnown ? '#818499' : '#818499',
+          margin: '5px 0',
+          padding: step.isDot ? '0' : '5px',
+          background: step.isPyusd && !step.isDot ? 'transparent' : 'transparent',
+          borderRadius: '3px',
+          fontSize: '15px',
+          fontWeight: 300,
+          fontFamily: "Josefin Sans, sans-serif",
+          textAlign: 'left',
+        }}
+        onClick={() => {
+          const node = nodes.find((n) => n.id === step.id);
+          if (node) {
+            setCenter(node.position.x + 100, node.position.y + 50, { zoom: 1.0, duration: 500 });
+            setSelectedNode(node);
+            setSelectedNodeId(node.id);
+          }
+        }}
+      >
+        {step.isDot ? '•' : step.label}
+      </div>
+    );
   };
 
-  // useEffect(() => {
-  //   if (trace && receipt && fetchingNodeId) {
-  //     console.log('Trace and Receipt Data Received:', { trace, receipt });
-  //     handleDataFetched(fetchingNodeId, trace, receipt);
-  //     setFetchingNodeId(null);
-  //   }
-  // }, [trace, receipt, fetchingNodeId]);
-
-  const toggleTimeline = () => {
-    setIsTimelineOpen((prev) => !prev); // Toggle state
-    console.log('Timeline toggled, isOpen:', !isTimelineOpen); // Debug state change
+  const decodeInput = (input) => {
+    if (!input || input.length < 10) return 'Unknown';
+    const signature = input.slice(0, 10).toLowerCase();
+    const signatures = {
+      '0xa9059cbb': 'Transfer',
+      '0x23b872dd': 'TransferFrom',
+      '0x095ea7b3': 'Approve',
+      '0xdd62ed3e': 'Allowance',
+      '0x5af547e6': 'Collect',
+      '0x2e1a7d4d': 'Withdraw',
+      '0xd0e30db0': 'Deposit',
+      '0x38ed1739': 'Swap',
+      '0x7ff36ab5': 'SwapExactETHForTokens',
+      '0x049639fb': 'JoinStrategy',
+      '0x70a08231': 'BalanceOf',
+      '0x37e0ac02': 'ExecuteOperation',
+      '0xa231a780': 'ExecuteOperation',
+      '0xe449022e': 'uniswapV3Swap',
+      '0x128acb08': 'Multicall'
+    };
+    return signatures[signature] || 'Custom Call';
   };
+
+  const getCallDepth = (nodeId) => {
+    let depth = 0;
+    let currentId = nodeId;
+    while (currentId) {
+      const node = nodes.find((n) => n.id === currentId);
+      if (!node || !node.data.parentId) break;
+      depth++;
+      currentId = node.data.parentId;
+    }
+    return depth;
+  };
+
+  const toggleSidePanel = () => setIsSidePanelOpen((prev) => !prev);
 
   return (
     <>
@@ -1470,7 +1672,7 @@ const containerNode = {
       <ReactFlow
         nodes={nodes.map(node => ({
           ...node,
-          data: { ...node.data, loading, error } // Pass loading/error to nodes
+          data: { ...node.data, loading, error, selected: node.id === selectedNodeId },
         }))}
         edges={edges}
         onNodesChange={(changes) => setNodes((nds) => applyNodeChanges(changes, nds) as CustomNode[])}
@@ -1478,6 +1680,7 @@ const containerNode = {
         onConnect={(params) => setEdges((eds) => addEdge(params, eds))}
         style={{ width: '100%', height: '100%' }}
         nodeTypes={nodeTypes}
+        onlyRenderVisibleElements={true}
       >
         <Controls />
         <Background variant="dots" gap={25} size={1.5} />
@@ -1501,7 +1704,7 @@ const containerNode = {
       {timeline.length > 0 && (
         <>
           <button
-            className={`${isTimelineOpen ? styles.timelineArrowVisible : styles.timelineArrowHidden}`}
+            className={`${isSidePanelOpen ? styles.sidePanelArrowVisible : styles.sidePanelArrowHidden}`}
             style={{
               position: 'fixed',
               right: '10px',
@@ -1520,54 +1723,172 @@ const containerNode = {
               boxShadow: '0 2px 5px rgba(0, 0, 0, 0.3)',
               transition: 'transform 0.5s ease-in-out',
             }}
-            onClick={toggleTimeline}
+            onClick={toggleSidePanel}
           >
-             {isTimelineOpen ? '▶' : '◀'}
+            {isSidePanelOpen ? '▶' : '◀'}
           </button>
           <div
-            className={`${isTimelineOpen ? styles.timelineVisible : styles.timelineHidden}`}
+            className={`${isSidePanelOpen ? styles.sidePanelVisible : styles.sidePanelHidden}`}
             style={{
               position: 'fixed',
               right: '10px',
               top: 90,
-              width: '220px',
-              maxHeight: '50vh',
-              overflowY: 'auto',
-              background: '#01021464',
+              width: '250px',
+              height: `${window.innerHeight * 0.55}px`,
+              background: '#010214',
               padding: '10px',
-              borderRadius: '8px',
+              borderRadius: '8px 0 0 8px',
               boxShadow: '0 2px 5px rgba(0, 0, 0, 0.3)',
               zIndex: 1000,
               transition: 'transform 0.5s ease-in-out',
             }}
           >
-            {timeline.map((step, idx) => (
-              <div
-                key={step.id}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <button
+                onClick={() => setActiveTab('timeline')}
                 style={{
+                  flex: 1,
+                  background: activeTab === 'timeline' ? '#818499' : 'transparent',
+                  border: 'none',
+                  color: '#fff',
+                  padding: '5px',
                   cursor: 'pointer',
-                  color: step.isPyusd ? 'rgba(0, 102, 204)' : step.isKnown ? '#818499' : '#818499',
-                  margin: '5px 0',
-                  padding: step.isDot ? '0' : '5px',
-                  background: step.isPyusd && !step.isDot ? 'transparent' : 'transparent',
-                  borderRadius: '3px',
-                  fontSize: step.isDot ? '13px' : '12px',
-                  fontWeight: 300,
-                  fontFamily: "Josefin Sans, sans-serif",
-                  textAlign: step.isDot ? 'left' : 'left',
-                }}
-                onClick={() => {
-                  const node = nodes.find((n) => n.id === step.id);
-                  if (node) setCenter(node.position.x + 100, node.position.y + 50, { zoom: 1.0, duration: 500 });
                 }}
               >
-                {step.isDot ? '•' : step.label}
-              </div>
-            ))}
+                Timeline
+              </button>
+              <button
+                onClick={() => setActiveTab('nodeTickler')}
+                style={{
+                  flex: 1,
+                  background: activeTab === 'nodeTickler' ? '#818499' : 'transparent',
+                  border: 'none',
+                  color: '#fff',
+                  padding: '5px',
+                  cursor: 'pointer',
+                }}
+              >
+                Node Tickler
+              </button>
+              <button
+                onClick={() => setActiveTab('digDeeper')}
+                style={{
+                  flex: 1,
+                  background: activeTab === 'digDeeper' ? '#818499' : 'transparent',
+                  border: 'none',
+                  color: '#fff',
+                  padding: '5px',
+                  cursor: 'pointer',
+                }}
+              >
+                Dig Deeper
+              </button>
+            </div>
+            {activeTab === 'timeline' && (
+              <FixedSizeList
+                height={window.innerHeight * 0.5 - 50}
+                width={230}
+                itemCount={timeline.length}
+                itemSize={35}
+                style={{ overflowY: 'auto' }}
+              >
+                {TimelineRow}
+              </FixedSizeList>
+            )}
+{activeTab === 'nodeTickler' && (
+  <div style={{ color: '#fff', padding: '10px', borderRadius: '10px' }}>
+    {selectedNode ? (
+      <>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+          <div
+            style={{
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              background: selectedNode.data.callDepthColor,
+              marginRight: '10px',
+            }}
+          />
+          <h3>{selectedNode.data.contractName || 'Unknown'}</h3>
         </div>
+        <p>Role: {decodeInput(selectedNode.data.input)}</p>
+        <p>Input: {selectedNode.data.input.slice(0, 20)}...</p>
+        {selectedNode.data.error && <p style={{ color: '#FF0000' }}>Error: {selectedNode.data.error}</p>}
+        <div>
+          <strong>Relationships:</strong>
+          <p>
+            Caller:{' '}
+            {selectedNode.data.parentId === null
+              ? 'None' // Root node
+              : nodes.some((n) => n.id === selectedNode.data.parentId && n.data.parentId === null)
+              ? 'Root' // Parent is the root
+              : (() => {
+                  const parentNode = nodes.find((n) => n.id === selectedNode.data.parentId);
+                  return parentNode
+                    ? parentNode.data.contractName ||
+                      (parentNode.data.to ? `${parentNode.data.to.slice(0, 6)}...` : 'Unknown')
+                    : 'Unknown (Parent Not Found)';
+                })()}
+          </p>
+          <p>
+            Callees:{' '}
+            {edges
+              .filter((e) => e.source === selectedNode.id)
+              .map((e) => {
+                const targetNode = nodes.find((n) => n.id === e.target);
+                return targetNode?.data.contractName || (targetNode?.data.to ? `${targetNode.data.to.slice(0, 6)}...` : 'Unknown');
+              })
+              .join(', ') || 'None'}
+          </p>
+        </div>
+      </>
+    ) : (
+      <p>Select a node from the timeline or graph</p>
+    )}
+  </div>
+)}
+            {activeTab === 'digDeeper' && (
+              <div style={{ color: '#fff', padding: '10px' }}>
+                <button
+                  onClick={() => {
+                    const digDeeperNode = nodes.find((n) => n.type === 'digDeeper');
+                    if (digDeeperNode) {
+                      setCenter(
+                        digDeeperNode.position.x + 100,
+                        digDeeperNode.position.y + 50,
+                        { zoom: 1.0, duration: 500 }
+                      );
+                    }
+                  }}
+                  style={{
+                    // background: '#818499',
+                    color: '#818499',
+                    // border: '1px solid #818499',
+                    borderRadius: '50%',
+                    cursor: 'pointer',
+                    marginBottom: '10px',
+                  }}
+                >
+                <i className="fa-solid fa-hand"></i>
+                  
+                </button>
+                {mevAnalysis.ran ? (
+                  <>
+                    <h3>Addresses</h3>
+                    <ul>
+                      {mevAnalysis.results.map((result, index) => (
+                        <li key={index}>{result}</li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <p>Go to DigDeeper node to Start Mocking!</p>
+                )}
+              </div>
+            )}
+          </div>
         </>
       )}
-        
       </ReactFlow>
       <LatestTxScroller />
 

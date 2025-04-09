@@ -165,6 +165,7 @@
     animation: fadeIn 0.5s ease-in forwards, pulse 2.5s none;
   }
   
+  
   .digDeeperButton button {
     background: rgba(129, 132, 153, 0.08);
     color: rgba(255, 255, 255, 0.92);
@@ -192,6 +193,12 @@
   @keyframes fadeIn {
     0% { opacity: 0; }
     100% { opacity: 1; }
+  }
+
+  @keyframes callpulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.5); }
+    100% { transform: scale(1); }
   }
   
   @keyframes pulse {
@@ -290,55 +297,52 @@
     background-color: #020428; 
   }
   
-  /* Focus effect */
   .selectorNode select:focus {
     outline: none;
     border-color: #7BCFFF;
     box-shadow: 0 0 5px #7bcfffa3;
   }
 
-  .timelineVisible {
+  .sidePanelVisible {
     transform: translateX(0px);
   }
   
-  .timelineHidden {
-    transform: translateX(220px);
+  .sidePanelHidden {
+    transform: translateX(250px);
   }
 
-  .timelineArrowVisible {
-    transform: translateX(-220px);
+  .sidePanelArrowVisible {
+    transform: translateX(-250px);
   }
   
-  .timelineArrowHidden {
+  .sidePanelArrowHidden {
     transform: translateX(0px);
   }
   
-  /* Scrollbar styling for timeline */
-  .timelineVisible::-webkit-scrollbar,
-  .timelineHidden::-webkit-scrollbar {
-    width: 6px; /* Slimmer scrollbar */
+  .sidePanelVisible::-webkit-scrollbar,
+  .sidePanelHidden::-webkit-scrollbar {
+    width: 6px;
   }
   
-  .timelineVisible::-webkit-scrollbar-track,
-  .timelineHidden::-webkit-scrollbar-track {
-    background: rgba(1, 2, 20, 0.4); /* Darker track, matches #01021464 */
+  .sidePanelVisible::-webkit-scrollbar-track,
+  .sidePanelHidden::-webkit-scrollbar-track {
+    background: rgba(1, 2, 20, 0.4);
     border-radius: 8px;
   }
   
-  .timelineVisible::-webkit-scrollbar-thumb,
-  .timelineHidden::-webkit-scrollbar-thumb {
-    background: #818499; /* Matches your known/unknown text color */
+  .sidePanelVisible::-webkit-scrollbar-thumb,
+  .sidePanelHidden::-webkit-scrollbar-thumb {
+    background: #818499;
     border-radius: 8px;
   }
   
-  .timelineVisible::-webkit-scrollbar-thumb:hover,
-  .timelineHidden::-webkit-scrollbar-thumb:hover {
+  .sidePanelVisible::-webkit-scrollbar-thumb:hover,
+  .sidePanelHidden::-webkit-scrollbar-thumb:hover {
     background: #a0a4b8;
   }
   
-  /* Firefox fallback (less granular) */
-  .timelineVisible,
-  .timelineHidden {
-    scrollbar-width: thin; /* Slim scrollbar */
-    scrollbar-color: #818499 rgba(1, 2, 20, 0.4); /* Thumb and track */
+  .sidePanelVisible,
+  .sidePanelHidden {
+    scrollbar-width: thin;
+    scrollbar-color: #818499 rgba(1, 2, 20, 0.4);
   }

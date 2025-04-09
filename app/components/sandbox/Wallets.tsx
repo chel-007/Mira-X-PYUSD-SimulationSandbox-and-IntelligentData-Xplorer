@@ -16,7 +16,12 @@ const RPC_URL = `https://blockchain.googleapis.com/v1/projects/${gcpProjectId}/l
 
 const PYUSD_ADDRESS = '0x6c3ea9036406852006290770bedfcaba0e23a0e8'.toLowerCase();
 
-const Wallets = () => {
+interface WalletsProps {
+  mockAddress: string | null;
+  setMockAddress: React.Dispatch<React.SetStateAction<string | null>>;
+}
+
+const Wallets = ({ mockAddress, setMockAddress }: WalletsProps) => {
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const [activeSection, setActiveSection] = useState(0);
@@ -32,9 +37,9 @@ const Wallets = () => {
   const [view, setView] = useState('balance');
   const [isLoading, setIsLoading] = useState(false);
   const [isStakingLoading, setIsStakingLoading] = useState(false);
-  const [mockAddress, setMockAddress] = useState<string | null>(null);
+  // const [mockAddress, setMockAddress] = useState<string | null>(null);
   const [isMocking, setIsMocking] = useState(false);
-  const [tempMockAddress, setTempMockAddress] = useState<string>(''); // For confirmation step
+  const [tempMockAddress, setTempMockAddress] = useState<string>('');
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const { ethPrice, loading: ethPriceLoading } = useEthPrice();
   
@@ -419,9 +424,16 @@ const Wallets = () => {
     }
   };
 
+  // useEffect(() => {
+  //   if (mockAddress && !isMocking) {
+  //     setTempMockAddress(mockAddress);
+  //     setShowConfirmDialog(true);
+  //   }
+  // }, [mockAddress]);
+
   const handleMockAddressSubmit = () => {
-    console.log("Mock address set:", tempMockAddress);
-    setMockAddress(tempMockAddress);
+    console.log('Mock address set:', tempMockAddress);
+    setMockAddress(tempMockAddress); // Update shared state
     setShowConfirmDialog(false);
     setIsMocking(false);
     setTempMockAddress('');

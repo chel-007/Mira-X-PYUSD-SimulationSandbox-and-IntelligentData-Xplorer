@@ -44,13 +44,14 @@ type CustomEdge = Edge<any>;
 
 const Sandbox = () => {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('transactions');
+  const [activeTab, setActiveTabMain] = useState<'transactions' | 'wallets' | 'liquidityPools'>('transactions');
   const [nodes, setNodes] = useState<CustomNode[]>([]);
   const [edges, setEdges] = useState<CustomEdge[]>([]);
+  const [mockAddress, setMockAddress] = useState<string | null>(null);
 
 
   const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
+    setActiveTabMain(tab);
     setNodes([]);
     setEdges([]);
   };
@@ -63,9 +64,10 @@ const Sandbox = () => {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'transactions':
-        return <SimulationProvider><Transactions setNodes={setNodes} setEdges={setEdges} nodes={nodes} edges={edges} />;</SimulationProvider>
+        return <SimulationProvider><Transactions setNodes={setNodes} setEdges={setEdges} nodes={nodes} edges={edges} setActiveTabMain={setActiveTabMain}
+        mockAddress={mockAddress} setMockAddress={setMockAddress} />;</SimulationProvider>
       case 'wallets':
-        return <Wallets />;
+        return <Wallets mockAddress={mockAddress} setMockAddress={setMockAddress} />;
       case 'liquidityPools':
         return (
           <div className={styles.centerButton}>
