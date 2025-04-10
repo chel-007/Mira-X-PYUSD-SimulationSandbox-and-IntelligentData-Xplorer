@@ -1,7 +1,7 @@
 // Sandbox.tsx
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from "../styles/Sandbox.module.css";
 import style1 from "../styles/Home.module.css";
 import { useRouter } from 'next/navigation';
@@ -15,6 +15,7 @@ import { ReactFlowProvider, Node, Edge } from '@xyflow/react';
 // const Wallets = dynamic(() => import('../components/sandbox/Wallets'), { ssr: false });
 import Transactions from '../components/sandbox/Transactions';
 import Wallets from '../components/sandbox/Wallets';
+import Developers from '../components/connect/Developers';
 import { WagmiProvider } from 'wagmi';
 import { http, createConfig } from 'wagmi';
 import { mainnet, sepolia } from 'wagmi/chains';
@@ -44,16 +45,24 @@ type CustomEdge = Edge<any>;
 
 const Sandbox = () => {
   const router = useRouter();
-  const [activeTab, setActiveTabMain] = useState<'transactions' | 'wallets' | 'liquidityPools'>('transactions');
+  const [activeTab, setActiveTabMain] = useState<'transactions' | 'wallets' | 'developers'>('transactions');
   const [nodes, setNodes] = useState<CustomNode[]>([]);
   const [edges, setEdges] = useState<CustomEdge[]>([]);
   const [mockAddress, setMockAddress] = useState<string | null>(null);
 
+  useEffect(() => {
+    const queryTab = new URLSearchParams(window.location.search).get('tab');
+    if (queryTab === 'developers' || queryTab === 'wallets') {
+      setActiveTabMain(queryTab);
+    }
+  }, []); // Empty dependency array to run only on mount
 
-  const handleTabChange = (tab: string) => {
+  const handleTabChange = (tab: 'transactions' | 'wallets' | 'developers') => {
     setActiveTabMain(tab);
     setNodes([]);
     setEdges([]);
+    
+    router.replace(`/sandbox?tab=${tab}`, undefined, { shallow: true });
   };
 
   const handleExploreClick = () => {
@@ -68,14 +77,8 @@ const Sandbox = () => {
         mockAddress={mockAddress} setMockAddress={setMockAddress} />;</SimulationProvider>
       case 'wallets':
         return <Wallets mockAddress={mockAddress} setMockAddress={setMockAddress} />;
-      case 'liquidityPools':
-        return (
-          <div className={styles.centerButton}>
-            <button onClick={() => console.log('Select Pool')}>
-              Select Pool
-            </button>
-          </div>
-        );
+      case 'developers':
+        return <Developers />;
       default:
         return null;
     }
@@ -116,10 +119,10 @@ const Sandbox = () => {
                 <h2>Wallets</h2>
               </div>
               <div
-                className={`${styles.card} ${activeTab === 'liquidityPools' ? styles.active : ''}`}
-                onClick={() => handleTabChange('liquidityPools')}
+                className={`${styles.card} ${activeTab === 'developers' ? styles.active : ''}`}
+                onClick={() => handleTabChange('developers')}
               >
-                <h2>Liquidity Pools</h2>
+                <h2>Developers</h2>
               </div>
             </div>
             <div className={styles.canvas}>

@@ -3,19 +3,35 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
 // Define the shape of the simulation result
-interface SimulationResult {
+export interface BaseSimulationResult {
   gasEstimate?: string;
-  gasPrice?: string; // Added for SimulationResultBox
+  gasPrice?: string;
   amount?: string;
   simulationResult?: string;
   error?: string;
-  status?: string; // Added for "Sending now" and "Sent"
-  txHash?: string; // Added for transaction hash
+  status?: string;
+  txHash?: string;
   amountIn?: string;
   amountOut?: string;
   slippage?: string;
   tokenIn?: string;
+  fee?: string;
+  feePercentage?: string;
+  poolAddress?: string;
 }
+
+export interface ApprovalSimulationResult {
+  needsApproval: true;
+  message: string;
+  tokenIn: string;
+  amountIn: string;
+  amountInWei: string;
+  poolAddress: string;
+  tokenAddress: string;
+  handleApprove: () => Promise<void>;
+}
+
+export type SimulationResult = BaseSimulationResult | ApprovalSimulationResult;
 
 // Define the full context type
 interface SimulationContextType {

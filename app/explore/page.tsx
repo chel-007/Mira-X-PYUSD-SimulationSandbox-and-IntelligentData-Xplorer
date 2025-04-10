@@ -200,19 +200,19 @@ const Explore = () => {
           className={activeTab === "adoption" ? styles.activeTab : styles.tab}
           onClick={() => setActiveTab("adoption")}
         >
-          <i className="fas fa-search"></i>
+        <i class="fa-solid fa-chart-pie-simple"></i>
         </button>
         <button
           className={activeTab === "gas" ? styles.activeTab : styles.tab}
           onClick={() => setActiveTab("gas")}
         >
-          <i className="fas fa-search"></i>
+         <i className="fa-solid fa-bolt"></i>
         </button>
         <button
           className={activeTab === "defi" ? styles.activeTab : styles.tab}
           onClick={() => setActiveTab("defi")}
         >
-          <i className="fa-solid fa-bolt"></i>
+          <i className="fa-solid fa-square-poll-vertical"></i>
         </button>
       </div>
     </div>

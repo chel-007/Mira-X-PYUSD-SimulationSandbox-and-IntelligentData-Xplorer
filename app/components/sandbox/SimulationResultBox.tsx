@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSimulation } from '../../utils/SimulationContext';
+import { useSimulation, BaseSimulationResult, SimulationResult } from '../../utils/SimulationContext'; // Import the types
 import styles from '../../styles/Simulation.module.css';
 
 const SimulationResultBox = ({
@@ -14,21 +14,17 @@ const SimulationResultBox = ({
   const { simulationResult, isMainnet } = useSimulation();
   const [processingStep, setProcessingStep] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(true);
-  const [sending, setSending] = useState(false);
-  
 
   const getTransferSuggestions = (gasEstimate: string, gasPrice: string, transferAmount?: string) => {
     const gasUnits = BigInt(gasEstimate);
     const gasPriceWei = BigInt(gasPrice);
     const gasWei = gasUnits * gasPriceWei;
     const gasEth = Number(gasWei) / 1_000_000_000_000_000_000;
-  
-    // --- Current Time ---
+
     const now = new Date();
-    const currentHour = now.getUTCHours(); // 0-23 UTC
-    const today = now.toISOString().split('T')[0]; // "2025-04-07"
-  
-    // --- Last Hour Fees (current or most recent hour) ---
+    const currentHour = now.getUTCHours();
+    const today = now.toISOString().split('T')[0];
+
     const lastHourFees = timeOfDay
       .filter((d) => {
         const isToday = d.event_date === today;
@@ -36,12 +32,11 @@ const SimulationResultBox = ({
         return isToday && isLastHour && d.transaction_count > 0;
       })
       .map((d) => d.avg_gas_fee_eth);
-  
+
     const avgLastHour = lastHourFees.length > 0
       ? lastHourFees.reduce((sum, fee) => sum + fee, 0) / lastHourFees.length
-      : 0.0002; // Fallback for no recent data
-  
-    // --- Trend Direction (last hour vs. previous hour) ---
+      : 0.0002;
+
     const prevHourFees = timeOfDay
       .filter((d) => {
         const isToday = d.event_date === today;
@@ -49,15 +44,14 @@ const SimulationResultBox = ({
         return isPrevHour && d.transaction_count > 0;
       })
       .map((d) => d.avg_gas_fee_eth);
-  
+
     const prevHourAvg = prevHourFees.length > 0
       ? prevHourFees.reduce((sum, fee) => sum + fee, 0) / prevHourFees.length
       : avgLastHour;
-  
+
     const percentChange = prevHourAvg > 0 ? ((avgLastHour - prevHourAvg) / prevHourAvg * 100) : 0;
     const gasTrendDirection = percentChange < -5 ? 'dropping' : percentChange > 5 ? 'rising' : 'stable';
-  
-    // --- Efficiency (last 24 hours of transfers from timeOfDay) ---
+
     const oneDayAgo = now.getTime() - 24 * 60 * 60 * 1000;
     const recentFees = timeOfDay
       .filter((d) => {
@@ -65,20 +59,18 @@ const SimulationResultBox = ({
         return timestamp >= oneDayAgo && d.transaction_count > 0;
       })
       .map((d) => d.avg_gas_fee_eth);
-  
+
     const avgTransferGasEth = recentFees.length > 0
       ? recentFees.reduce((sum, fee) => sum + fee, 0) / recentFees.length
-      : 0.0002; // Fallback
+      : 0.0002;
     const isEfficient = gasEth < avgTransferGasEth;
-  
-    // --- Cost Ratio ---
+
     const ethPrice = 2000;
     const amountUsd = transferAmount ? parseFloat(transferAmount) : 0;
     const gasUsd = gasEth * ethPrice;
     const gasCostRatio = amountUsd > 0 ? (gasUsd / amountUsd) * 100 : Infinity;
     const isCostEffective = gasCostRatio < 2;
-  
-    // --- Suggestions ---
+
     const isGoodTime = gasEth < avgLastHour * 1.1;
     let suggestion = '';
     if (isGoodTime && isEfficient) {
@@ -92,24 +84,10 @@ const SimulationResultBox = ({
     } else {
       suggestion = `Fees are ${gasTrendDirection}—send if urgent (${gasEth.toFixed(6)} ETH)`;
     }
-  
+
     const trend = `Gas fees are ${gasTrendDirection} (last hour: ${avgLastHour.toFixed(6)} ETH)`;
     const efficiency = isEfficient ? 'Efficient gas usage' : 'Higher than average gas';
-  
-    console.log('Debug:', {
-      gasEth,
-      currentHour,
-      avgLastHour,
-      lastHourFees: lastHourFees.length,
-      prevHourAvg,
-      avgTransferGasEth,
-      recentFees: recentFees.length,
-      isGoodTime,
-      isEfficient,
-      isCostEffective,
-      gasTrendDirection,
-    });
-  
+
     return {
       gasUnits: gasUnits.toString(),
       gasWei: gasWei.toString(),
@@ -121,37 +99,34 @@ const SimulationResultBox = ({
     };
   };
 
-  const getSwapSuggestions = (result: SimulationResult) => {
+  const getSwapSuggestions = (result: BaseSimulationResult) => {
     const gasWei = BigInt(result.gasEstimate || '0');
     const gasPriceWei = BigInt(result.gasPrice || '0');
     const gasEth = Number(gasWei * gasPriceWei) / 1_000_000_000_000_000_000;
     const amountInNum = parseFloat(result.amountIn || '0');
     const amountOutNum = parseFloat(result.amountOut || '0');
     const slippage = parseFloat(result.slippage?.replace('%', '') || '0');
-  
-    // Gas timing using timeOfDay
+
+    // console.log("simulation slippage", slippage)
+
     const currentHour = new Date().getUTCHours();
     const currentHourData = timeOfDay.find((d) => d.hour_of_day === currentHour);
     const avgGasFeeEth = currentHourData?.avg_gas_fee_eth || 0;
     const historicalAvg = timeOfDay.reduce((sum, d) => sum + d.avg_gas_fee_eth, 0) / timeOfDay.length;
     const isGoodTime = avgGasFeeEth < historicalAvg * 0.9;
-  
-    // Efficiency using gasFeeData
+
     const avgSwapGasEth = gasFeeData
       .filter((d) => d.event_type === 'Swap')
       .reduce((sum, d) => sum + d.avg_gas_fee_eth, 0) / (gasFeeData.length || 1);
     const isEfficient = gasEth < avgSwapGasEth;
-  
-    // Gas cost vs. swap value (innovation point)
-    const swapValueDiff = amountOutNum - amountInNum; // Stablecoin profit/loss
-    const gasCostImpact = gasEth / Math.abs(swapValueDiff || 1); // Avoid division by 0
-    const isWorthIt = gasCostImpact < 0.05; // Gas < 5% of swap value change
-  
-    // Pool liquidity trend (innovation point)
-    const pool = poolMetricsData.find((p) => p.pool_address.toLowerCase() === result.tokenIn?.toLowerCase());
+
+    const swapValueDiff = amountOutNum - amountInNum;
+    const gasCostImpact = gasEth / Math.abs(swapValueDiff || 1);
+    const isWorthIt = gasCostImpact < 0.05;
+
+    const pool = poolMetricsData.find((p) => p.pool_address.toLowerCase() === result.poolAddress?.toLowerCase());
     const liquidityTrend = pool?.tvl_usd > pool?.total_volume_usd * 2 ? 'stable' : 'volatile';
-  
-    // Enhanced suggestion logic
+
     let suggestion = '';
     if (isGoodTime && slippage < 0.5 && isWorthIt) {
       suggestion = `Swap now: low gas (${gasEth.toFixed(6)} ETH), low slippage (${slippage}%), and cost-effective!`;
@@ -162,10 +137,10 @@ const SimulationResultBox = ({
     } else {
       suggestion = `Wait for better conditions: gas (${gasEth.toFixed(6)} ETH) or slippage (${slippage}%) too high`;
     }
-  
+
     return {
       gasEth: gasEth.toFixed(9),
-      amountOut: amountOutNum.toFixed(3),
+      amountOut: amountOutNum.toFixed(6),
       slippage: slippage.toFixed(2) + '%',
       suggestion,
       efficiency: isEfficient ? 'Efficient gas usage' : 'Higher than average gas',
@@ -174,7 +149,7 @@ const SimulationResultBox = ({
   };
 
   useEffect(() => {
-    if (simulationResult && !simulationResult.error && !simulationResult.txHash) {
+    if (simulationResult && !('error' in simulationResult) && !('txHash' in simulationResult) && !('needsApproval' in simulationResult)) {
       const isSwap = !!simulationResult.amountIn;
       const steps = isSwap
         ? ['Fetching pool data...', 'Estimating swap rates...', 'Analyzing gas and slippage...']
@@ -202,10 +177,10 @@ const SimulationResultBox = ({
 
   if (!simulationResult) return null;
 
-  const isSwap = !!simulationResult.amountIn;
-  const explorerUrl = simulationResult?.txHash
-  ? `https://${isMainnet ? 'etherscan.io' : 'sepolia.etherscan.io'}/tx/${simulationResult.txHash}`
-  : '';
+  const isSwap = 'amountIn' in simulationResult && !!simulationResult.amountIn;
+  const explorerUrl = 'txHash' in simulationResult && simulationResult.txHash
+    ? `https://${isMainnet ? 'etherscan.io' : 'sepolia.etherscan.io'}/tx/${simulationResult.txHash}`
+    : '';
 
   return (
     <div className={`${styles.simulationContainer} ${isVisible ? styles.visible : styles.hidden}`}>
@@ -217,13 +192,13 @@ const SimulationResultBox = ({
           processingStep ? styles.processing : ''
         }`}
       >
-        {simulationResult.error ? (
+        {'error' in simulationResult && simulationResult.error ? (
           <p>Error: {simulationResult.error}</p>
-        ) : simulationResult.status === 'Sending now' ? (
+        ) : 'status' in simulationResult && simulationResult.status === 'Sending now' ? (
           <div className={styles.processingWrapper}>
             <p>Sending now...</p>
           </div>
-        ) : simulationResult.txHash ? (
+        ) : 'txHash' in simulationResult && simulationResult.txHash ? (
           <div className={styles.resultContent}>
             <p>
               Transaction Hash:{' '}
@@ -233,33 +208,55 @@ const SimulationResultBox = ({
             </p>
             <p className={styles.detail}>Add Tx in Mira X Sandbox</p>
           </div>
+        ) : 'needsApproval' in simulationResult && simulationResult.needsApproval ? (
+          <div className={styles.resultContent}>
+            <p>{simulationResult.message}</p>
+            <p>
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  simulationResult.handleApprove();
+                }}
+                style={{ color: '#7bcfff', cursor: 'pointer' }}
+              >
+                Approve?
+              </a>
+            </p>
+          </div>
+        ) : 'status' in simulationResult && simulationResult.status === 'Approved, please simulate again' ? (
+          <div className={styles.resultContent}>
+            <p>{simulationResult.status}</p>
+          </div>
         ) : (
           <div className={styles.contentWrapper}>
             {processingStep ? (
               <div className={styles.processingWrapper}>
-                <p>Gas Estimate: {simulationResult.gasEstimate} wei</p>
+                <p>Gas Estimate: {'gasEstimate' in simulationResult ? simulationResult.gasEstimate : 'N/A'} wei</p>
                 <p className={styles.processingText}>{processingStep}</p>
               </div>
             ) : isSwap ? (
               (() => {
-                const { gasEth, amountOut, slippage, suggestion, efficiency } = getSwapSuggestions(simulationResult);
+                const result = simulationResult as BaseSimulationResult; // Type assertion after narrowing
+                const { gasEth, amountOut, slippage, suggestion, efficiency } = getSwapSuggestions(result);
                 return (
                   <div className={styles.resultContent}>
                     <p>Amount Out: {amountOut} PYUSD</p>
                     <p>Slippage: {slippage}</p>
                     <p>Gas Cost: {gasEth} ETH</p>
                     <p className={styles.suggestion}>Mira AI Suggestion: {suggestion}</p>
+                    <p>Fee: {'fee' in simulationResult ? simulationResult.fee : 'N/A'} PYUSD ({'feePercentage' in simulationResult ? simulationResult.feePercentage : 'N/A'})</p>
                     <p className={styles.detail}>Efficiency: {efficiency}</p>
                   </div>
                 );
               })()
             ) : (
               (() => {
+                const result = simulationResult as BaseSimulationResult; // Type assertion after narrowing
                 const { gasUnits, gasWei, gasEth, suggestion, trend, efficiency, gasCostRatio } = getTransferSuggestions(
-                  simulationResult.gasEstimate,
-                  simulationResult.gasPrice,
-                  simulationResult.amount
-
+                  result.gasEstimate || '0',
+                  result.gasPrice || '0',
+                  result.amount
                 );
                 return (
                   <div className={styles.resultContent}>

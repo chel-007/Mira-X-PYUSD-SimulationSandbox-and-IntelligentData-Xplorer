@@ -16,6 +16,7 @@ export const useTransactionTrace = () => {
   const [receipt, setReceipt] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  // const [block, setBlock] = useState(null)
 
   const fetchTraceAndReceipt = async (txHash: string, rpcUrl: string) => { // Change to rpcUrl (string)
     console.log("fetchTrace RPC_URL:", rpcUrl); // Log the URL directly
@@ -57,6 +58,21 @@ export const useTransactionTrace = () => {
       console.log("Receipt Result:", receiptResult);
       if (receiptResult.error) throw new Error(receiptResult.error.message || 'Receipt RPC Error');
       setReceipt(receiptResult.result);
+
+      // New: Fetch block data
+    // const blockResponse = await fetch(rpcUrl, {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({
+    //     jsonrpc: '2.0',
+    //     id: 3,
+    //     method: 'eth_getBlockByNumber',
+    //     params: [receiptResult.result.blockNumber, true], // true for full TX objects
+    //   }),
+    // });
+    // const blockResult = await blockResponse.json();
+    // if (blockResult.error) throw new Error(blockResult.error.message || 'Block RPC Error');
+    // setBlock(blockResult.result);
 
       setLoading(false);
     } catch (err) {

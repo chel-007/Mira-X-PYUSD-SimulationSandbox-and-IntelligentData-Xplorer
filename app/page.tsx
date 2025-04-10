@@ -11,6 +11,7 @@ export default function Home() {
 
   const handleTradeClick = () => router.push("/explore");
   const handleSandboxClick = () => router.push("/sandbox");
+  const handleConnectClick = () => router.push("/sandbox?tab=developers");
 
   return (
     <div className={styles.container}>
@@ -51,8 +52,10 @@ export default function Home() {
 
           <div className={styles.feature}>
             <div className={styles.largeText}>Connect</div>
-            <div className={styles.subtext}>data api on gcp infrastructure</div>
-            <button className={`${styles.featureButton} ${styles.battle}`}>
+            <div className={styles.subtext}>smart api on GCP infrastructure</div>
+            <button 
+            onClick={handleConnectClick}
+            className={`${styles.featureButton} ${styles.battle}`}>
               For Builders <i className="fa-solid fa-bolt"></i>
             </button>
           </div>

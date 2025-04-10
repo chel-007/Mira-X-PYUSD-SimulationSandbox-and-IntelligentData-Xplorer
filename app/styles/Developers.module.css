@@ -1,0 +1,140 @@
+/* components/Developers.module.css */
+.container {
+    padding: 10px 20px 10px 30px;
+    color: #818499;
+    font-family: "Josefin Sans", sans-serif;
+    overflow: hidden;
+    height: 100%;
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .apiIntro {
+    background: linear-gradient(135deg, rgba(129, 132, 153, 0.08) 0%, #010214 100%);
+    border-radius: 15px;
+    padding: 10px 20px 10px 30px;
+    text-align: center;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+  }
+  
+  .sectionTitle {
+    font-size: 1.8rem;
+    margin-bottom: 10px;
+    color: #7BCFFF;
+  }
+  
+  .sectionDescription {
+    font-size: 1.1rem;
+    line-height: 1.5;
+    margin-bottom: 20px;
+  }
+  
+  .bottomSections {
+    background: rgba(129, 132, 153, 0.08);
+    display: flex;
+    border-radius: 15px;
+    gap: 10px;
+    justify-content: space-between;
+    /* overflow-y: auto; */
+    max-height: calc(100% - 120px);
+    flex: 1;
+  }
+  
+  .section {
+    background: rgba(14, 14, 15, 0.08);
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    width: 100%;
+  }
+  
+  .subSectionTitle {
+    font-size: 1.5rem;
+    margin-bottom: 15px;
+    color: #7BCFFF;
+  }
+  
+  .docsContainer {
+    display: flex;
+    gap: 20px;
+    height: 80%;
+  }
+  
+  .list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    width: 30%;
+  }
+  
+  .listItem {
+    font-size: 1rem;
+    margin-bottom: 15px;
+    color: #818499;
+    cursor: pointer;
+    position: relative;
+    padding-right: 20px;
+    text-decoration: underline;
+    text-decoration-color: #818499;
+    text-decoration-thickness: 1px;
+    transition: color 0.3s ease;
+  }
+  
+  .listItem:hover {
+    color: #7BCFFF;
+  }
+  
+  .listItem.active {
+    color: #7BCFFF;
+    font-weight: bold;
+  }
+  
+  .arrow {
+    position: absolute;
+    right: 0;
+    opacity: 0.8;
+    color: #7BCFFF;
+    font-size: 0.9rem;
+  }
+  
+  .contentArea {
+    width: 70%;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+    padding: 15px;
+    border: 0.2px solid rgba(129, 132, 153, 0.15);
+    display: flex;
+    flex-direction: column;
+    max-height: 250px;
+  }
+  
+  .contentTitle {
+    font-size: 0rem;
+    color: #7BCFFF;
+  }
+  
+  .contentDescription {
+    font-size: 1rem;
+    line-height: 1.5;
+    margin-bottom: 10px;
+    color: #d3d3d3;
+  }
+  
+  .codeBlock {
+    background: #141423;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 0.7rem;
+    color: #e0e0e0;
+    white-space: pre-wrap;
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 170px;
+  }
+  
+  .codeBlock code {
+    font-family: 'Courier New', Courier, monospace;
+  }

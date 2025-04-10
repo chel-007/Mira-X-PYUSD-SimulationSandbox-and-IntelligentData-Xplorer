@@ -16,7 +16,8 @@ import { useData } from '../../utils/DataProvider';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useEthPrice } from "../../utils/EthPriceProvider";
-import { createPortal } from 'react-dom';
+// import { createPortal } from 'react-dom';
+import { ethers } from 'ethers';
 
 
 const gcpProjectId = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT_ID;
@@ -823,11 +824,56 @@ const MockButtonNode = ({ data, id }) => {
   const [loading, setLoading] = useState(false);
   const [isSimulated, setIsSimulated] = useState(false);
   const [errorState, setErrorState] = useState(false);
-  const { simulateTransfer, sendTransfer, simulateSwap } = useTransactionSimulation(data.rpcUrl);
+  const { simulateTransfer, sendTransfer, simulateSwap, walletClient } = useTransactionSimulation(data.rpcUrl);
   const { setSimulationResult, clearSimulation } = useSimulation();
   const isSwap = data.inputs?.AmountIn;
 
+  const handleApprove = async (tokenAddress: string, poolAddress: string, amountInWei: string) => {
+    // console.log('handleApprove - walletClient:', walletClient);
+    if (!walletClient) {
+      setSimulationResult({ error: 'Wallet not connected' });
+      return;
+    }
+    setLoading(true);
+    try {
+      // Use walletClient.writeContract to send the approve transaction
+      const txHash = await walletClient.writeContract({
+        address: tokenAddress,
+        abi: [
+          {
+            constant: false,
+            inputs: [
+              { name: 'spender', type: 'address' },
+              { name: 'amount', type: 'uint256' },
+            ],
+            name: 'approve',
+            outputs: [{ name: '', type: 'bool' }],
+            type: 'function',
+          },
+        ],
+        functionName: 'approve',
+        args: [poolAddress, amountInWei],
+        account: walletClient.account,
+      });
+  
+      // Wait for the transaction to be mined
+      const provider = new ethers.JsonRpcProvider(data.rpcUrl);
+      const receipt = await provider.waitForTransaction(txHash);
+      if (receipt?.status === 1) {
+        setSimulationResult({ status: 'Approved, please simulate again' });
+      } else {
+        throw new Error('Transaction failed');
+      }
+    } catch (error) {
+      setSimulationResult({ error: `Approval failed: ${(error as Error).message}` });
+      setErrorState(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleMock = async () => {
+    // console.log('handleMock - walletClient:', walletClient);
     if (errorState) {
       data.clearFlow();
       setErrorState(false);
@@ -838,7 +884,7 @@ const MockButtonNode = ({ data, id }) => {
     setLoading(true);
     clearSimulation();
     const { From, To, Amount, AmountIn, AmountOut, inputToken } = data.inputs || {};
-    // console.log("inputtoken", inputToken)
+    // console.log("isswap", isSwap)
 
     if (isSwap) {
       if (!From || !AmountIn || !inputToken) {
@@ -856,8 +902,18 @@ const MockButtonNode = ({ data, id }) => {
           inputToken,
           poolMetricsData
         );
+        if ('needsApproval' in result && result.needsApproval) {
+          const approveHandler = () => handleApprove(result.tokenAddress, result.poolAddress, result.amountInWei);
+          console.log('Setting handleApprove:', approveHandler);
+          setSimulationResult({
+            ...result,
+            handleApprove: () => handleApprove(result.tokenAddress, result.poolAddress, result.amountInWei),
+          });
+        } else {
+          setSimulationResult(result);
+        }
         // console.log("simulation result", result)
-        setSimulationResult(result);
+        // setSimulationResult(result);
         // setNodes((nds) =>
         //   nds.map((node) =>
         //     node.data.key === 'AmountOut'
@@ -1583,25 +1639,27 @@ setEdges((eds) => {
 
   const TimelineRow = ({ index, style }) => {
     const step = timeline[index];
-    const is1inchV5 = step.label?.includes('1inch V5');
+    const is1inchV5 = step.label?.includes('1inch');
     const isUsdt = step.label?.includes('USDT');
     const isUsdc = step.label?.includes('USDC');
     const isUniswap = step.label?.includes('uniswap');
     const isCoinbase = step.label?.includes('coinbase');
     const isKyberswap = step.label?.includes('kyberswap');
+    const isMimic = step.label?.includes('mimic');
+    const isAave = step.label?.includes('aave');
     const isMev = step.label?.includes('mev');
     return (
       <div
         style={{
           ...style,
           cursor: 'pointer',
-          color: is1inchV5 ? '#9B59B6' : isUsdt ? '#26A17B': isUsdc ? '#FF69B4': isUniswap ? '#FF69B4': isCoinbase ? '#0052FF': isKyberswap ? '#31CB9E': isMev ? '#FF4500':
+          color: is1inchV5 ? '#9B59B6' : isUsdt ? '#26A17B': isUsdc ? '#FF69B4': isMimic ? '#2EBAC6': isAave ? '#bdbcb9': isUniswap ? '#FF69B4': isCoinbase ? '#0052FF': isKyberswap ? '#31CB9E': isMev ? '#FF4500':
           step.isPyusd ? 'rgba(0, 102, 204)' : step.isKnown ? '#818499' : '#818499',
           margin: '5px 0',
           padding: step.isDot ? '0' : '5px',
           background: step.isPyusd && !step.isDot ? 'transparent' : 'transparent',
           borderRadius: '3px',
-          fontSize: '15px',
+          fontSize: '12px',
           fontWeight: 300,
           fontFamily: "Josefin Sans, sans-serif",
           textAlign: 'left',
@@ -1796,10 +1854,10 @@ setEdges((eds) => {
               </FixedSizeList>
             )}
 {activeTab === 'nodeTickler' && (
-  <div style={{ color: '#fff', padding: '10px', borderRadius: '10px' }}>
+  <div style={{ color: '#fff', padding: '10px', borderRadius: '10px', fontSize: '14px' }}>
     {selectedNode ? (
       <>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', fontSize: '13px' }}>
           <div
             style={{
               width: '20px',
@@ -1814,7 +1872,7 @@ setEdges((eds) => {
         <p>Role: {decodeInput(selectedNode.data.input)}</p>
         <p>Input: {selectedNode.data.input.slice(0, 20)}...</p>
         {selectedNode.data.error && <p style={{ color: '#FF0000' }}>Error: {selectedNode.data.error}</p>}
-        <div>
+        <div style={{marginTop: '10px'}}>
           <strong>Relationships:</strong>
           <p>
             Caller:{' '}
@@ -1869,7 +1927,8 @@ setEdges((eds) => {
                     marginBottom: '10px',
                   }}
                 >
-                <i className="fa-solid fa-hand"></i>
+                {/* <i className="fa-solid fa-hand"></i> */}
+                <i className="fas fa-hand-pointer"></i>
                   
                 </button>
                 {mevAnalysis.ran ? (
