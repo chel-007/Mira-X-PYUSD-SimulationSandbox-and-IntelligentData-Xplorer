@@ -27,7 +27,7 @@ const ChartReports = ({ view, transactionData, gasData }) => {
     if (view === 'gas') drawGasChart(width, height);
   };
 
-  // Balance Chart
+  // Balance Chart (unchanged)
   const drawBalanceChart = (width, height) => {
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
@@ -71,7 +71,7 @@ const ChartReports = ({ view, transactionData, gasData }) => {
         const y = yScale(d.transactions);
         const w = xScale.bandwidth();
         const h = chartHeight - y;
-        const r = Math.min(10, w / 2); // Responsive corner radius
+        const r = Math.min(10, w / 2);
         return `M ${x} ${y + r} Q ${x} ${y} ${x + r} ${y} L ${x + w - r} ${y} Q ${x + w} ${y} ${x + w} ${y + r} L ${x + w} ${y + h} L ${x} ${y + h} Z`;
       })
       .attr('fill', '#7BCFFF');
@@ -88,60 +88,78 @@ const ChartReports = ({ view, transactionData, gasData }) => {
       .remove();
   };
 
-  // Gas Chart
+  // Gas Chart (with fixes)
   const drawGasChart = (width, height) => {
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
-
-    const margin = { top: 40, right: 20, bottom: 50, left: 40 };
+  
+    const margin = { top: 40, right: 20, bottom: 70, left: 40 }; // Increased bottom margin for labels
     const chartWidth = width - margin.left - margin.right;
     const chartHeight = height - margin.top - margin.bottom;
-
-    const isEmpty = gasData.every(d => d.gas === '0.000');
+  
+    const isEmpty = gasData.every(d => parseFloat(d.gas) === 0);
     if (isEmpty || gasData.length === 0) return;
-
+  
     const xScale = d3.scaleBand()
       .domain(gasData.map(d => d.date))
       .range([0, chartWidth])
       .padding(0.2);
-
+  
+    const maxGas = d3.max(gasData, d => parseFloat(d.gas));
     const yScale = d3.scaleLinear()
-      .domain([0, d3.max(gasData, d => d.gas) * 1.1 || 0.05])
-      .range([chartHeight, 0]);
-
+      .domain([0, (maxGas * 1.1) || 0.05])
+      .range([chartHeight, 0])
+      .clamp(true);
+  
     const g = svg.append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
-
+  
+    // Add a clipping path to prevent overflow
+    const clip = svg.append('defs')
+      .append('clipPath')
+      .attr('id', 'chart-clip')
+      .append('rect')
+      .attr('x', 0)
+      .attr('y', 0)
+      .attr('width', chartWidth)
+      .attr('height', chartHeight);
+  
+    // Create a separate group for the chart content (line and dots) with clipping
+    const chartGroup = g.append('g')
+      .attr('clip-path', 'url(#chart-clip)');
+  
     const line = d3.line()
       .x(d => xScale(d.date) + xScale.bandwidth() / 2)
-      .y(d => yScale(d.gas));
-
-    g.append('path')
+      .y(d => yScale(parseFloat(d.gas)));
+  
+    chartGroup.append('path')
       .datum(gasData)
       .attr('fill', 'none')
       .attr('stroke', '#7BCFFF')
       .attr('stroke-width', 2)
       .attr('d', line);
-
-    const tooltip = d3.select('body').select('.gas-tooltip') // Reuse or create unique tooltip
+  
+    const tooltip = d3.select('body').select('.gas-tooltip')
       .data([null])
       .enter()
       .append('div')
       .attr('class', 'gas-tooltip')
       .style('position', 'absolute')
       .style('visibility', 'hidden');
-
-    g.selectAll('.dot')
+  
+    console.log("gasdata", gasData);
+  
+    chartGroup.selectAll('.dot')
       .data(gasData)
       .enter()
       .append('circle')
       .attr('cx', d => xScale(d.date) + xScale.bandwidth() / 2)
-      .attr('cy', d => yScale(d.gas))
+      .attr('cy', d => yScale(parseFloat(d.gas)))
       .attr('r', 5)
       .attr('fill', '#7BCFFF')
       .on('mouseover', (event, d) => {
         tooltip.style('visibility', 'visible')
-          .text(`Gas: ${d.gas} Gwei`)
+          .text(`Gas: ${d.gas} USD`)
           .style('left', `${event.pageX + 10}px`)
           .style('top', `${event.pageY - 10}px`)
           .style('background', 'rgba(255, 255, 255, 0.9)')
@@ -151,24 +169,25 @@ const ChartReports = ({ view, transactionData, gasData }) => {
           .style('font-size', '12px');
       })
       .on('mouseout', () => tooltip.style('visibility', 'hidden'));
-
+  
+    // Add x-axis (dates) in the main group, not clipped
     g.append('g')
       .attr('transform', `translate(0, ${chartHeight})`)
       .call(d3.axisBottom(xScale))
-      .select('.domain')
-      .remove();
-
-    g.append('g')
-      .call(d3.axisLeft(yScale).ticks(5))
-      .select('.domain')
-      .remove();
+      .selectAll('text')
+      .attr('fill', '#ccc')
+      .style('font-size', '12px')
+      .style('font-family', 'Josefin Sans, sans-serif')
+      .attr('transform', 'rotate(0)') // Changed to -45 for better readability
+      .style('text-anchor', 'middle');
+  
+    g.select('.domain').remove();
   };
 
   // Setup chart and resize listener
   useEffect(() => {
     if (!chartRef.current) return;
 
-    // Initial SVG setup
     d3.select(chartRef.current).selectAll('*').remove();
     const svg = d3.select(chartRef.current)
       .append('svg')
@@ -177,16 +196,14 @@ const ChartReports = ({ view, transactionData, gasData }) => {
       .style('display', 'block');
     svgRef.current = svg.node();
 
-    // Draw initial chart
     resizeChart();
 
-    // Add resize observer
     const observer = new ResizeObserver(() => resizeChart());
     observer.observe(chartRef.current);
 
     return () => {
       observer.disconnect();
-      d3.select('body').select('.gas-tooltip').remove(); // Cleanup tooltip
+      d3.select('body').select('.gas-tooltip').remove();
     };
   }, [view, transactionData, gasData]);
 
@@ -195,7 +212,7 @@ const ChartReports = ({ view, transactionData, gasData }) => {
       ref={chartRef}
       style={{
         width: '100%',
-        minHeight: '350px', // Minimum height
+        minHeight: '350px',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',

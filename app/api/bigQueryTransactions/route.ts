@@ -145,7 +145,7 @@ export async function GET() {
       DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) AS event_date,
       event_type,
       AVG(CAST(gas_used AS INT64) * CAST(gas_price AS BIGNUMERIC) / 1e18) AS avg_gas_fee_eth,
-      COUNT(DISTINCT tx_hash) AS transaction_count,
+      COUNT(tx_hash) AS transaction_count,
       ARRAY_AGG(tx_hash) AS tx_hash
     FROM \`${projectId}.pyusd_data.lp_activity_and_gas_latest\`
     WHERE event_type IN ('Transfer', 'Swap')
@@ -273,7 +273,7 @@ export async function GET() {
     //   transaction_count: parseInt(row.transaction_count),
     // }));
 
-    // console.log(swapVolumeData)
+    console.log(swapVolumeData)
     // console.log(timeOfDayData)
     // console.log("gas", gasComparisonData)
     console.log(poolMetricsData)

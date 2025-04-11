@@ -125,7 +125,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error("Failed to fetch BigQuery data:", bigQueryData.error);
       toast.error(`Internet not stable. Please refresh the app ${bigQueryData.error}`, {
         position: 'top-right',
-        autoClose: 5000,
+        autoClose: 10000,
         hideProgressBar: false,
         closeOnClick: true,
         pauseOnHover: true,
@@ -176,7 +176,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error("Error fetching Curve volume API:", error);
       toast.error(`Unstable Internet. Please refresh the app ${error}`, {
         position: 'top-right',
-        autoClose: 5000,
+        autoClose: 10000,
         hideProgressBar: false,
         closeOnClick: true,
         pauseOnHover: true,
@@ -209,7 +209,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const dailyWalletGrowth = bigQueryData.dailyWalletGrowth.map((row: any) => ({
       date: row.date,
       newWallets: Number(row.newWallets),
-      wallets: row.wallets || [], // Assuming the query includes wallet addresses
+      wallets: row.wallets || [], 
     }));
     // console.log("BigQuery Wallet Growth Data:", dailyWalletGrowth);
 
@@ -309,7 +309,7 @@ const activeWalletSet = new Set(historicalData.activeWallets);
   setHistoricalActiveWallets(activeWalletSet.size); // Still a number here
   setHistoricalDormantWallets(historicalData.totalWallets - activeWalletSet.size);
 
-    return historicalData; // Return for potential use (e.g., totalWallets)
+    return historicalData;
   };
 
   // Fetch historical data once on mount
@@ -405,38 +405,96 @@ setTxPerHour(txInLastHour);
 setMaxTxPerHour(500); // Adjust as needed
 
         // Update Daily Volume (real-time)
-        const dailyMap = transactions.reduce((acc: Record<string, number>, tx: any) => {
-          const timestampMs = new Date(tx.timestamp).getTime();
-          const date = new Date(timestampMs).toISOString().split("T")[0];
-          const value = Number(tx.value);
-          if (date && !isNaN(value)) acc[date] = (acc[date] || 0) + value;
-          return acc;
-        }, {});
+        // const dailyMap = transactions.reduce((acc: Record<string, number>, tx: any) => {
+        //   const timestampMs = new Date(tx.timestamp).getTime();
+        //   const date = new Date(timestampMs).toISOString().split("T")[0];
+        //   const value = Number(tx.value);
+        //   if (date && !isNaN(value)) acc[date] = (acc[date] || 0) + value;
+        //   return acc;
+        // }, {});
 
-        const formattedDailyData = Object.entries(dailyMap)
-          .map(([date, value]) => ({ date, value: Number(value.toFixed(2)) }))
-          .filter((d) => {
-            const dateMs = new Date(d.date).getTime();
-            return d.date && !isNaN(d.value) && dateMs >= thirtyDaysAgo;
-          })
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        setRealTimeDailyVolume(formattedDailyData);
+        // const formattedDailyData = Object.entries(dailyMap)
+        //   .map(([date, value]) => ({ date, value: Number(value.toFixed(2)) }))
+        //   .filter((d) => {
+        //     const dateMs = new Date(d.date).getTime();
+        //     return d.date && !isNaN(d.value) && dateMs >= thirtyDaysAgo;
+        //   })
+        //   .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        // setRealTimeDailyVolume(formattedDailyData);
 
-        // Update Monthly Volume (real-time)
-        const monthlyMap = transactions.reduce((acc: Record<string, number>, tx: any) => {
-          const timestampMs = new Date(tx.timestamp).getTime();
-          const dateObj = new Date(timestampMs);
-          const yearMonth = `${dateObj.getFullYear()}-${(dateObj.getMonth() + 1).toString().padStart(2, "0")}`;
-          const value = Number(tx.value);
-          if (yearMonth && !isNaN(value)) acc[yearMonth] = (acc[yearMonth] || 0) + value;
-          return acc;
-        }, {});
+        // // Update Monthly Volume (real-time)
+        // const monthlyMap = transactions.reduce((acc: Record<string, number>, tx: any) => {
+        //   const timestampMs = new Date(tx.timestamp).getTime();
+        //   const dateObj = new Date(timestampMs);
+        //   const yearMonth = `${dateObj.getFullYear()}-${(dateObj.getMonth() + 1).toString().padStart(2, "0")}`;
+        //   const value = Number(tx.value);
+        //   if (yearMonth && !isNaN(value)) acc[yearMonth] = (acc[yearMonth] || 0) + value;
+        //   return acc;
+        // }, {});
 
-        const formattedMonthlyData = Object.entries(monthlyMap)
-          .map(([date, value]) => ({ date, value: Number(value.toFixed(2)) }))
-          .filter((d) => d.date && !isNaN(d.value))
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        setRealTimeMonthlyVolume(formattedMonthlyData);
+        // const formattedMonthlyData = Object.entries(monthlyMap)
+        //   .map(([date, value]) => ({ date, value: Number(value.toFixed(2)) }))
+        //   .filter((d) => d.date && !isNaN(d.value))
+        //   .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        // setRealTimeMonthlyVolume(formattedMonthlyData);
+
+        // Update Daily Volume (combine historical and real-time)
+  const dailyMap: Record<string, number> = {};
+
+  // Add historical daily data to the map
+  historicalDataRef.current?.dailyData?.forEach((historical: { date: string; value: number }) => {
+    const dateMs = new Date(historical.date).getTime();
+    if (dateMs >= thirtyDaysAgo) {
+      dailyMap[historical.date] = (dailyMap[historical.date] || 0) + historical.value;
+    }
+  });
+
+  // Add real-time daily data to the map
+  transactions.forEach((tx: any) => {
+    const timestampMs = new Date(tx.timestamp).getTime();
+    const date = new Date(timestampMs).toISOString().split("T")[0];
+    const value = Number(tx.value);
+    if (date && !isNaN(value)) {
+      dailyMap[date] = (dailyMap[date] || 0) + value;
+    }
+  });
+
+  const formattedDailyData = Object.entries(dailyMap)
+    .map(([date, value]) => ({ date, value: Number(value.toFixed(2)) }))
+    .filter((d) => {
+      const dateMs = new Date(d.date).getTime();
+      return d.date && !isNaN(d.value) && dateMs >= thirtyDaysAgo;
+    })
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    setDailyVolume(formattedDailyData)
+  setRealTimeDailyVolume(formattedDailyData);
+
+  // Update Monthly Volume (combine historical and real-time)
+  const monthlyMap: Record<string, number> = {};
+
+  // Add historical monthly data to the map
+  historicalDataRef.current?.monthlyData?.forEach((historical: { date: string; value: number }) => {
+    monthlyMap[historical.date] = (monthlyMap[historical.date] || 0) + historical.value;
+  });
+
+  // Add real-time monthly data to the map
+  transactions.forEach((tx: any) => {
+    const timestampMs = new Date(tx.timestamp).getTime();
+    const dateObj = new Date(timestampMs);
+    const yearMonth = `${dateObj.getFullYear()}-${(dateObj.getMonth() + 1).toString().padStart(2, "0")}`;
+    const value = Number(tx.value);
+    if (yearMonth && !isNaN(value)) {
+      monthlyMap[yearMonth] = (monthlyMap[yearMonth] || 0) + value;
+    }
+  });
+
+  const formattedMonthlyData = Object.entries(monthlyMap)
+    .map(([date, value]) => ({ date, value: Number(value.toFixed(2)) }))
+    .filter((d) => d.date && !isNaN(d.value))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    setMonthlyVolume(formattedMonthlyData)
+  setRealTimeMonthlyVolume(formattedMonthlyData);
+
 
         // Update Wallet Growth (real-time)
         const seenWallets = new Set(historicalDataRef.current?.dailyWalletGrowth.flatMap((row: any) => row.wallets || []));
@@ -866,15 +924,6 @@ setMaxTxPerHour(500); // Adjust as needed
           const poolAddress = event.address.toLowerCase();
           let volumeUsd = 0;
       
-          // Log each swap event
-          // console.log(`Swap Event:`, {
-          //   date,
-          //   poolAddress,
-          //   args: event.args,
-          //   timestamp: event.block_timestamp,
-          //   txHash: event.tx_hash, // Assuming you have this in normalizedEvents
-          // });
-      
           if (event.event_type === "Swap") {
             if (poolAddress === CURVE_POOL_PYUSD_CRVUSD) {
               const soldId = parseInt(event.args.sold_id);
@@ -898,9 +947,6 @@ setMaxTxPerHour(500); // Adjust as needed
           return acc;
         }, {});
 
-        // console.log("historicalswapvolume", historicalData.current?.swapVolumeData)
-      
-      // console.log("realtimeswapvolume", realTimeSwapVolume);
         setRealTimeSwapVolumeData(realTimeSwapVolumeData);
 
         // Update Pool Metrics Chart (real-time)
@@ -1077,40 +1123,40 @@ setMaxTxPerHour(500); // Adjust as needed
   }, [ethPrice]);
 
   // Combine historical and real-time data for Daily Volume
-  useEffect(() => {
-    const combinedDaily = [...historicalDailyVolume];
-    realTimeDailyVolume.forEach(rt => {
-      const existing = combinedDaily.find(d => d.date === rt.date);
-      if (existing) {
-        existing.value += rt.value;
-      } else {
-        combinedDaily.push(rt);
-      }
-    });
-    const now = new Date();
-    const thirtyDaysAgo = now.getTime() - 30 * 24 * 60 * 60 * 1000;
-    setDailyVolume(
-      combinedDaily
-        .filter(d => new Date(d.date).getTime() >= thirtyDaysAgo)
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    );
-  }, [historicalDailyVolume, realTimeDailyVolume]);
+  // useEffect(() => {
+  //   const combinedDaily = [...historicalDailyVolume];
+  //   realTimeDailyVolume.forEach(rt => {
+  //     const existing = combinedDaily.find(d => d.date === rt.date);
+  //     if (existing) {
+  //       existing.value += rt.value;
+  //     } else {
+  //       combinedDaily.push(rt);
+  //     }
+  //   });
+  //   const now = new Date();
+  //   const thirtyDaysAgo = now.getTime() - 30 * 24 * 60 * 60 * 1000;
+  //   setDailyVolume(
+  //     combinedDaily
+  //       .filter(d => new Date(d.date).getTime() >= thirtyDaysAgo)
+  //       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  //   );
+  // }, [historicalDailyVolume, realTimeDailyVolume]);
 
-  // Combine historical and real-time data for Monthly Volume
-  useEffect(() => {
-    const combinedMonthly = [...historicalMonthlyVolume];
-    realTimeMonthlyVolume.forEach(rt => {
-      const existing = combinedMonthly.find(d => d.date === rt.date);
-      if (existing) {
-        existing.value += rt.value;
-      } else {
-        combinedMonthly.push(rt);
-      }
-    });
-    setMonthlyVolume(
-      combinedMonthly.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    );
-  }, [historicalMonthlyVolume, realTimeMonthlyVolume]);
+  // // Combine historical and real-time data for Monthly Volume
+  // useEffect(() => {
+  //   const combinedMonthly = [...historicalMonthlyVolume];
+  //   realTimeMonthlyVolume.forEach(rt => {
+  //     const existing = combinedMonthly.find(d => d.date === rt.date);
+  //     if (existing) {
+  //       existing.value += rt.value;
+  //     } else {
+  //       combinedMonthly.push(rt);
+  //     }
+  //   });
+  //   setMonthlyVolume(
+  //     combinedMonthly.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  //   );
+  // }, [historicalMonthlyVolume, realTimeMonthlyVolume]);
 
   useEffect(() => {
     const combinedWalletGrowth = [...historicalWalletGrowthData];

@@ -1,27 +1,29 @@
 /* components/Developers.module.css */
 .container {
-    padding: 10px 20px 10px 30px;
+    padding: 10px 10px 10px 30px;
     color: #818499;
     font-family: "Josefin Sans", sans-serif;
     overflow: hidden;
     height: 100%;
     max-height: 100%;
     display: flex;
+    /* gap: 50px; */
     flex-direction: column;
   }
   
   .apiIntro {
-    background: linear-gradient(135deg, rgba(129, 132, 153, 0.08) 0%, #010214 100%);
+    background: linear-gradient(135deg, rgba(129, 132, 153, 0.08) -20%, #010214 100%);
     border-radius: 15px;
-    padding: 10px 20px 10px 30px;
+    padding: 10px 20px 10px 20px;
     text-align: center;
     margin-bottom: 20px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-    backdrop-filter: blur(10px);
+    border: 0.2px solid #8184992b;
+    /* box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px); */
   }
   
   .sectionTitle {
-    font-size: 1.8rem;
+    font-size: 1.6rem;
     margin-bottom: 10px;
     color: #7BCFFF;
   }
@@ -33,22 +35,22 @@
   }
   
   .bottomSections {
-    background: rgba(129, 132, 153, 0.08);
+    /* background: rgba(129, 132, 153, 0.08); */
     display: flex;
     border-radius: 15px;
     gap: 10px;
-    justify-content: space-between;
+    justify-content: center;
     /* overflow-y: auto; */
-    max-height: calc(100% - 120px);
+    max-height: calc(100% - 150px);
     flex: 1;
   }
   
   .section {
-    background: rgba(14, 14, 15, 0.08);
+    background: rgba(129, 132, 153, 0.08);;
     border-radius: 15px;
     padding: 20px;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-    width: 100%;
+    width: 90%;
   }
   
   .subSectionTitle {
@@ -89,7 +91,7 @@
   
   .listItem.active {
     color: #7BCFFF;
-    font-weight: bold;
+    font-weight: 500;
   }
   
   .arrow {
@@ -124,11 +126,11 @@
   }
   
   .codeBlock {
-    background: #141423;
+    background: #0f0f19;
     border-radius: 8px;
     padding: 10px;
-    font-size: 0.7rem;
-    color: #e0e0e0;
+    font-size: 0.75rem;
+    color: #e0e0e0cb;
     white-space: pre-wrap;
     overflow-x: auto;
     overflow-y: auto;
@@ -136,5 +138,28 @@
   }
   
   .codeBlock code {
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'Courier', monospace;
   }
+
+
+  .codeBlock::-webkit-scrollbar,
+.bottomSections::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.codeBlock::-webkit-scrollbar-track,
+.bottomSections::-webkit-scrollbar-track {
+  background: #010214;
+}
+
+.codeBlock::-webkit-scrollbar-thumb,
+.bottomSections::-webkit-scrollbar-thumb {
+  background: #818499;
+  border-radius: 3px;
+}
+
+.codeBlock::-webkit-scrollbar-thumb:hover,
+.bottomSections::-webkit-scrollbar-thumb:hover {
+  background: #81849984;
+}

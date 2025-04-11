@@ -386,6 +386,8 @@ legend.exit().remove();
     };
   }, [swapVolumeData]);
 
+  
+
   return (
     <div ref={chartContainerRef} style={{ width: "100%", height: "100%" }}>
       <svg ref={svgRef} style={{ width: "100%", height: "100%" }} />

@@ -8,9 +8,8 @@ const Developers = () => {
   // Define the content for each doc section
   const docContent: { [key: string]: { description: string; code: string } } = {
     'Installation Guide': {
-      description: 'Set up the MiraX Connect SDK in your project to integrate with the API and access real-time PYUSD insights.',
-      code: `// Install the SDK (not available on npm yet, use the code below)
-class InsightsClient {
+      description: 'Set up the MiraX Connect SDK in your project to integrate with the API.',
+      code: `class InsightsClient {
   constructor(token, url = 'wss://mirax-connect-api-250354620143.us-central1.run.app') {
     this.ws = new WebSocket(\`\${url}?token=\${token}\`);
     this.callbacks = [];
@@ -30,7 +29,7 @@ export default function getInsights(token, url) {
 }`,
     },
     'Authentication Setup': {
-      description: 'Authenticate your application using the required token to securely connect to the MiraX Connect API.',
+      description: 'Authenticate your application using the required token.',
       code: `// Use the provided token for authentication
 const REQUIRED_TOKEN = 'mirax_pyusd';
 
@@ -46,7 +45,7 @@ const BACKEND_URL = 'wss://mirax-connect-api-250354620143.us-central1.run.app';
 const insightsClient = getInsights(REQUIRED_TOKEN, BACKEND_URL);`,
     },
     'Code Examples': {
-      description: 'A practical example of integrating the MiraX Connect API into a Telegram Mini App to display real-time PYUSD insights.',
+      description: 'A practical example of integrating the MiraX Connect API into a Telegram Mini App.',
       code: `// Initialize the Telegram Web App and InsightsClient
 window.Telegram.WebApp.ready();
 
@@ -91,7 +90,7 @@ const styles = \`
         <h2 className={styles.sectionTitle}>MiraX Connect API</h2>
         <p className={styles.sectionDescription}>
           Integrate with the MiraX Connect API to access real-time PYUSD transaction data, 
-          smart analytics, and simulation tools. Built on robust GCP infrastructure, our API 
+          gas analysis, and simulation tools. Hosted on robust GCP infrastructure, the API 
           empowers developers to build intelligent applications with ease.
         </p>
       </div>
@@ -101,8 +100,8 @@ const styles = \`
         <div className={styles.section}>
           <h3 className={styles.subSectionTitle}>Docs - Plug SDK</h3>
           <p className={styles.sectionDescription}>
-            The MiraX Plug SDK provides a seamless way to integrate our API into your 
-            applications. Check out our comprehensive documentation to get started.
+            The MiraX SDK provides a seamless way to integrate our API into your 
+            applications. Check out the steps below to get started.
           </p>
           <div className={styles.docsContainer}>
             {/* Left: List of clickable items */}

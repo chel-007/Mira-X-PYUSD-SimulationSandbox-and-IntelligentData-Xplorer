@@ -139,3 +139,25 @@ html, body {
 }
 
 
+.Toastify__toast--warn {
+  background: rgba(244, 228, 54, 0.1) !important;
+  border: 1px solid #f4ee36 !important;
+  border-radius: 4px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  color: #999999 !important;
+  font-family: "Josefin Sans", sans-serif !important;
+  font-size: 0.9em !important;
+}
+
+.Toastify__toast--warn .Toastify__toast-icon {
+  color: #f4ee36 !important;
+}
+
+.Toastify__toast--warn .Toastify__close-button {
+  color: #f4ee36 !important;
+}
+
+.Toastify__toast--warn .Toastify__progress-bar {
+  background: #f4ee369d !important;
+}
+

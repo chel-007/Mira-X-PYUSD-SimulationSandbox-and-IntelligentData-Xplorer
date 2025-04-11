@@ -7,7 +7,6 @@ import ChartReports from './ChartReports';
 import StakingChart from './StakingChart';
 import { useEthPrice } from "../../utils/EthPriceProvider";
 import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 
 const gcpProjectId = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT_ID;
 const gcpApiKey = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_KEY;
@@ -55,10 +54,10 @@ const Wallets = ({ mockAddress, setMockAddress }: WalletsProps) => {
 
   const sections = ['Performance'];
 
-  // Fetch Wallet Balance (PYUSD ERC-20)
+  // Fetch Wallet Balance
   useEffect(() => {
     const fetchBalance = async () => {
-      if (!effectiveAddress) return; // Use effectiveAddress
+      if (!effectiveAddress) return;
       const data = {
         jsonrpc: '2.0',
         id: 1,
@@ -97,8 +96,29 @@ const Wallets = ({ mockAddress, setMockAddress }: WalletsProps) => {
     fetchBalance();
   }, [effectiveAddress]); // Update dependency to effectiveAddress
 
+  const lastMockAddressToast = useRef<string | null>(null);
+
+  // Show toast if user tries to mock without being connected
+  useEffect(() => {
+    if (mockAddress && !isConnected && lastMockAddressToast.current !== mockAddress) {
+      toast.info("Please connect your wallet to mock an address.", {
+        position: "top-right",
+        autoClose: 10000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+      lastMockAddressToast.current = mockAddress; // Prevent duplicate toasts for the same mockAddress
+    }
+    // Reset the toast tracking when mockAddress is cleared or user connects
+    if (!mockAddress || isConnected) {
+      lastMockAddressToast.current = null;
+    }
+  }, [mockAddress, isConnected]);
+
   // Fetch Transaction and Gas Data
-  const fetchTransactionData = async () => {
+  const fetchTransactionData = async () => { 
   
     if (!effectiveAddress || isLoading) return;
   
@@ -140,11 +160,11 @@ const Wallets = ({ mockAddress, setMockAddress }: WalletsProps) => {
       // Process gasData into USD
       const gasDataUsd = gasData.map(day => ({
         date: day.date,
-        gas: ethPrice ? (parseFloat(day.gas) * ethPrice).toFixed(2) : '0.00', // Fallback if ethPrice is unavailable
+        gas: ethPrice ? (parseFloat(day.gas) * ethPrice).toFixed(2) : '1700.00', // Fallback if ethPrice is unavailable
       }));
 
-      console.log("gasDataUsd", gasDataUsd)
-      console.log("ethPrice", ethPrice)
+      // console.log("gasDataUsd", gasDataUsd)
+      // console.log("ethPrice", ethPrice)
   
       // Update state only if address still matches
       setTransactionData(transactionData || []);
@@ -187,7 +207,7 @@ const Wallets = ({ mockAddress, setMockAddress }: WalletsProps) => {
           return acc;
         }, {});
       } else {
-        toast.error(`Failed to fetch API data ${data}`, {
+        toast.error(`Unstable Internet. Failed to fetch API data ${data}`, {
           position: "top-right",
           autoClose: 5000,
           hideProgressBar: false,
@@ -221,7 +241,7 @@ const Wallets = ({ mockAddress, setMockAddress }: WalletsProps) => {
           }
         });
       } else {
-        toast.error(`Failed to fetch API data ${volumeData}`, {
+        toast.error(`Unstable Internet. Failed to fetch API data ${volumeData}`, {
           position: "top-right",
           autoClose: 5000,
           hideProgressBar: false,
@@ -284,7 +304,7 @@ const Wallets = ({ mockAddress, setMockAddress }: WalletsProps) => {
     newStakingData.push({
       pool: 'Curve PYUSD/USDC',
       stakeAmount: payPoolStake,
-      apy: usdcPoolData.baseApy || 1.57, // Fallback APY
+      apy: usdcPoolData.baseApy || 0.57, // Fallback APY
       tvl: usdcPoolData.tvl || 15110000, // Fallback TVL
     });
   
@@ -329,8 +349,8 @@ const Wallets = ({ mockAddress, setMockAddress }: WalletsProps) => {
     newStakingData.push({
       pool: 'Curve PYUSD/crvUSD',
       stakeAmount: curveCrvUsdStake,
-      apy: crvUsdPoolData.baseApy || 2.1,
-      tvl: crvUsdPoolData.tvl || 8000000,
+      apy: crvUsdPoolData.baseApy || 0.6,
+      tvl: crvUsdPoolData.tvl || 3000000,
     });
   
     setStakingData(newStakingData);
@@ -341,11 +361,11 @@ const Wallets = ({ mockAddress, setMockAddress }: WalletsProps) => {
   
 
   useEffect(() => {
-    if (effectiveAddress) {
+    if (isConnected && effectiveAddress) {
       fetchTransactionData();
       fetchStakingData();
     }
-  }, [effectiveAddress]);
+  }, [effectiveAddress, isConnected]);
 
   const getActivityStatus = (count) => {
     if (count === 0) return 'IDLE';
@@ -382,7 +402,7 @@ const Wallets = ({ mockAddress, setMockAddress }: WalletsProps) => {
     fetchScore();
   }, [balance, transactionCount]);
 
-  // Scroll Handling (unchanged)
+
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -449,7 +469,7 @@ const Wallets = ({ mockAddress, setMockAddress }: WalletsProps) => {
 
   return (
 <div className={styles.walletContainer}>
-  {mockAddress && (
+  {isConnected && mockAddress && (
     <div className={styles.mockBanner}>
       <span>
         Mock Mode Active: Using address {mockAddress.slice(0, 6)}...{mockAddress.slice(-4)}
@@ -476,7 +496,7 @@ const Wallets = ({ mockAddress, setMockAddress }: WalletsProps) => {
         </div>
         <div className={styles.activityStat}>
           <span>
-            <i className="fa-solid fa-dollar-sign"></i>
+          <i className="fa-solid fa-wave-pulse"></i>
             <h3>Activity Status</h3>
           </span>
           <div className={styles.activityIndicator}>
@@ -533,7 +553,7 @@ const Wallets = ({ mockAddress, setMockAddress }: WalletsProps) => {
           Hi, {effectiveAddress?.slice(0, 6)}...{effectiveAddress?.slice(-4)}
         </div>
         <div className={styles.mockContainer}>
-          {mockAddress ? (
+          {isConnected && mockAddress ? (
             <div className={styles.mockingState}>
               <span>Mocking...</span>
               <button className={styles.cancelMockButton} disabled={isLoading} onClick={() => setMockAddress(null)}>
@@ -633,7 +653,10 @@ const Wallets = ({ mockAddress, setMockAddress }: WalletsProps) => {
           <div className={styles.noData}>No staking data for user</div>
         )}
 
-        {!isLoading && (view === 'balance' || view === 'gas') && (
+        {!isLoading && (
+          (view === 'balance' && !transactionData.every(d => d.transactions === 0)) || 
+          (view === 'gas' && !gasData.every(d => parseFloat(d.gas) === 0))
+        ) && (
           <ChartReports view={view} transactionData={transactionData} gasData={gasData} />
         )}
         {!isStakingLoading && view === 'staking' && stakingData.length > 0 && (

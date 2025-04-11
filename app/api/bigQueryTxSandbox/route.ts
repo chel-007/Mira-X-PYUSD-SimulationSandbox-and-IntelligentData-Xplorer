@@ -136,7 +136,7 @@ for (const row of gasRows[0]) {
   // console.log('Transaction Rows:', txRows[0]);
   // console.log('Gas Rows:', gasRows[0]);
   // console.log('Transaction Data:', txCountByDay);
-  // console.log('Gas Data:', gasByDay);
+  console.log('Gas Data:', gasByDay);
 
   return NextResponse.json({ transactionData: txCountByDay, gasData: gasByDay });
 }

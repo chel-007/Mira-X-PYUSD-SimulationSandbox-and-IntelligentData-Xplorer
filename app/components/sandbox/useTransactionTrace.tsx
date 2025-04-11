@@ -6,10 +6,10 @@ import 'react-toastify/dist/ReactToastify.css';
 const gcpProjectId = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT_ID;
 const gcpApiKey = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_KEY;
 
-const MAINNET_RPC_URL = `https://blockchain.googleapis.com/v1/projects/${gcpProjectId}/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=${gcpApiKey}`;
-const SEPOLIA_RPC_URL = `https://blockchain.googleapis.com/v1/projects/${gcpProjectId}/locations/us-central1/endpoints/ethereum-sepolia/rpc?key=${gcpApiKey}`;
-const MAINNET_PYUSD_ADDRESS = '0x6c3ea9036406852006290770bedfcaba0e23a0e8'.toLowerCase();
-const SEPOLIA_PYUSD_ADDRESS = '0xCaC524BcA292aaB298996aAd1179F7a59847426b'.toLowerCase();
+// const MAINNET_RPC_URL = `https://blockchain.googleapis.com/v1/projects/${gcpProjectId}/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=${gcpApiKey}`;
+// const SEPOLIA_RPC_URL = `https://blockchain.googleapis.com/v1/projects/${gcpProjectId}/locations/us-central1/endpoints/ethereum-sepolia/rpc?key=${gcpApiKey}`;
+// const MAINNET_PYUSD_ADDRESS = '0x6c3ea9036406852006290770bedfcaba0e23a0e8'.toLowerCase();
+// const SEPOLIA_PYUSD_ADDRESS = '0xCaC524BcA292aaB298996aAd1179F7a59847426b'.toLowerCase();
 
 export const useTransactionTrace = () => {
   const [trace, setTrace] = useState(null);
@@ -18,8 +18,8 @@ export const useTransactionTrace = () => {
   const [error, setError] = useState(null);
   // const [block, setBlock] = useState(null)
 
-  const fetchTraceAndReceipt = async (txHash: string, rpcUrl: string) => { // Change to rpcUrl (string)
-    console.log("fetchTrace RPC_URL:", rpcUrl); // Log the URL directly
+  const fetchTraceAndReceipt = async (txHash: string, rpcUrl: string) => {
+    // console.log("fetchTrace RPC_URL:", rpcUrl); // Log the URL directly
 
     if (!txHash || !/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
       setError(new Error('Invalid transaction hash'));

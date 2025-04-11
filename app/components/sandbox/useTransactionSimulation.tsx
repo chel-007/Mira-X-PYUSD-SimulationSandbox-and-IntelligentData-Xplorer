@@ -1,13 +1,10 @@
-import { JsonRpcProvider, Contract, parseUnits, Signer, ethers } from 'ethers';
+import { JsonRpcProvider, parseUnits, ethers } from 'ethers';
 import { useWalletClient } from 'wagmi';
 import { encodeFunctionData } from 'viem';
 import { useSendTransaction } from 'wagmi';
-import { BaseSimulationResult } from '@/app/utils/SimulationContext';
 
 const PYUSD_MAINNET_ADDRESS = '0x6c3ea9036406852006290770bedfcaba0e23a0e8';
 const PYUSD_SEPOLIA_ADDRESS = '0xcac524bca292aaade2df8a05cc58f0a65b1b3bb9';
-const CURVE_POOL_PYUSD_CRVUSD = '0x625e92624bc2d88619accc1788365a69767f6200';
-const CURVE_POOL_PYUSD_USDC = '0x383e6b4437b59fff47b619cba855ca29342a8559';
 
 
 const erc20Abi = [
@@ -81,7 +78,6 @@ export const useTransactionSimulation = (rpcUrl: any) => {
   const { data: walletClient } = useWalletClient();
   // console.log('useTransactionSimulation - walletClient:', walletClient);
   const provider = new JsonRpcProvider(rpcUrl);
-  const newProvider = new JsonRpcProvider(`https://eth-mainnet.g.alchemy.com/v2/XuMA7XSy_UALDkP7qj0DqwnJCC_7qt6U`)
   const { sendTransaction } = useSendTransaction();
 
   // console.log("rpcurl", rpcUrl)
@@ -99,7 +95,7 @@ export const useTransactionSimulation = (rpcUrl: any) => {
     const balance = BigInt(balanceRaw);
     const amountWei = parseUnits(amount, 6);
 
-    console.log(`Balance: ${balance}, Amount: ${amountWei}`); // Debug balance
+    console.log(`Balance: ${balance}, Amount: ${amountWei}`);
     if (balance < amountWei) {
       throw new Error(`Insufficient PYUSD balance: ${balance} < ${amountWei}`);
     }
@@ -118,7 +114,6 @@ export const useTransactionSimulation = (rpcUrl: any) => {
 
     const gasEstimate = await provider.estimateGas(transferTx);
   
-    // Manually fetch gas price via eth_gasPrice
     const gasPriceHex = await provider.send('eth_gasPrice', []);
     const feeData = await provider.getFeeData(); // v6 method
     const gasPrice = feeData.gasPrice || BigInt(await provider.send('eth_gasPrice', []));
@@ -158,28 +153,13 @@ export const useTransactionSimulation = (rpcUrl: any) => {
       throw new Error('Invalid transaction hash: ' + txHash);
     }
 
-    // Wait using the GCP provider
+    // wait using GCP provider
     const receipt = await provider.waitForTransaction(txHash, 1, 30000);
     if (!receipt) throw new Error('Transaction receipt not found');
     console.log('Transaction confirmed, receipt:', receipt);
 
     return { txHash: receipt.hash };
   };
-
-// Compute the storage slot for the allowance mapping
-const computeAllowanceSlot = (owner: string, spender: string, slotNumber: number) => {
-  // allowance mapping: mapping(address => mapping(address => uint256))
-  // First, hash the owner address with the slot number of the allowances mapping
-  const abiCoder = new ethers.AbiCoder();
-  const ownerSlot = ethers.keccak256(
-    abiCoder.encode(['address', 'uint256'], [owner, slotNumber])
-  );
-  // Then, hash the spender address with the owner slot to get the final storage slot
-  const finalSlot = ethers.keccak256(
-    abiCoder.encode(['address', 'uint256'], [spender, ownerSlot])
-  );
-  return finalSlot;
-};
 
 const simulateSwap = async (
   from: string,
@@ -210,7 +190,7 @@ const simulateSwap = async (
   // Define proxy addresses for each pool
   const proxyAddresses: { [key: string]: string } = {
     '0x625e92624bc2d88619accc1788365a69767f6200': '0x06cff7088619c7178f5e14f0b119458d08d2f5ef', // crvUSD/PYUSD pool
-    '0x383e6b4437b59fff47b619cba855ca29342a8559': '0x0000000000000000000000000000000000000000', // USDC/PYUSD pool (placeholder)
+    '0x383e6b4437b59fff47b619cba855ca29342a8559': '0x0000000000000000000000000000000000000000', // USDC/PYUSD pool
   };
 
   const proxyAddress = proxyAddresses[config.address.toLowerCase()];
@@ -284,7 +264,7 @@ const simulateSwap = async (
     gasPrice = feeData.gasPrice || BigInt(await provider.send('eth_gasPrice', []));
   } catch (error) {
     console.warn('Failed to fetch gas price, using fallback:', error.message);
-    gasPrice = BigInt(20000000000); // Fallback gas price (20 gwei)
+    gasPrice = BigInt(20000000000);
   }
 
   // Calculate amount out using get_dy
@@ -303,7 +283,7 @@ const simulateSwap = async (
 
   // Calculate fee
   const amountInNum = parseFloat(amountIn);
-  const fee = amountInNum - amountOutNum; // Fee in PYUSD (assuming 1:1 equivalence)
+  const fee = amountInNum - amountOutNum;
   const feePercentage = (fee / amountInNum) * 100;
   // console.log("fee calculation", { fee, feePercentage });
 

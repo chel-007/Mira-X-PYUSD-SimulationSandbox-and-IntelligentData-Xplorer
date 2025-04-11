@@ -25,7 +25,6 @@ const StakingChart = ({ stakingData, address }) => {
     const radiusInner = baseRadius * 0.6;
     const radiusOuter = baseRadius;
 
-    // Define gradients and filters
     const defs = svg.append('defs');
     activePools.forEach((d, i) => {
       const gradientId = d.pool.replace(/[^a-zA-Z0-9]/g, '-');
@@ -195,71 +194,69 @@ const StakingChart = ({ stakingData, address }) => {
     });
 
     // Info group
-// Info group
-const infoX = width > 600 ? centerX - baseRadius * 2.5 : 20;
-const infoGroup = svg.append('g')
-  .attr('transform', `translate(${infoX}, ${Math.max(20, baseRadius * 0.65)})`); // Dynamic top padding
+    const infoX = width > 600 ? centerX - baseRadius * 2.5 : 20;
+    const infoGroup = svg.append('g')
+      .attr('transform', `translate(${infoX}, ${Math.max(20, baseRadius * 0.65)})`);
 
-// Tooltip (append directly, no .data().enter())
-const tooltip = d3.select(chartRef.current)
-  .append('div')
-  .attr('class', 'staking-tooltip')
-  .style('position', 'absolute')
-  .style('visibility', 'hidden')
-  .style('background', 'rgba(129, 132, 153, 0.25)')
-  .style('padding', '3px 8px')
-  .style('border-radius', '8px')
-  .style('font-size', '10px')
-  .style('color', '#9196b0')
-  .style('pointer-events', 'none');
+    const tooltip = d3.select(chartRef.current)
+      .append('div')
+      .attr('class', 'staking-tooltip')
+      .style('position', 'absolute')
+      .style('visibility', 'hidden')
+      .style('background', 'rgba(129, 132, 153, 0.25)')
+      .style('padding', '3px 8px')
+      .style('border-radius', '8px')
+      .style('font-size', '10px')
+      .style('color', '#9196b0')
+      .style('pointer-events', 'none');
 
-stakingData.forEach((d, i) => {
-  const spacing = Math.max(30, baseRadius * 0.2); // Minimum 30px, scales with radius
-  const infoItem = infoGroup.append('g')
-    .attr('transform', `translate(0, ${i * spacing})`);
+    stakingData.forEach((d, i) => {
+      const spacing = Math.max(30, baseRadius * 0.2);
+      const infoItem = infoGroup.append('g')
+        .attr('transform', `translate(0, ${i * spacing})`);
 
-  infoItem.append('circle')
-    .attr('cx', 0)
-    .attr('cy', 0)
-    .attr('r', Math.min(8, baseRadius * 0.04))
-    .attr('fill', 'none')
-    .attr('stroke', '#818499')
-    .attr('stroke-width', 1);
+      infoItem.append('circle')
+        .attr('cx', 0)
+        .attr('cy', 0)
+        .attr('r', Math.min(8, baseRadius * 0.04))
+        .attr('fill', 'none')
+        .attr('stroke', '#818499')
+        .attr('stroke-width', 1);
 
-  infoItem.append('text')
-    .attr('x', 0)
-    .attr('y', 4)
-    .attr('text-anchor', 'middle')
-    .attr('fill', '#fff')
-    .attr('font-size', Math.min(14, baseRadius * 0.06))
-    .text('i');
+      infoItem.append('text')
+        .attr('x', 0)
+        .attr('y', 4)
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#fff')
+        .attr('font-size', Math.min(14, baseRadius * 0.06))
+        .text('i');
 
-  infoItem.append('text')
-    .attr('x', 20)
-    .attr('y', 4)
-    .attr('fill', '#fff')
-    .attr('font-size', Math.min(14, baseRadius * 0.06))
-    .text(`${d.pool}`);
+      infoItem.append('text')
+        .attr('x', 20)
+        .attr('y', 4)
+        .attr('fill', '#fff')
+        .attr('font-size', Math.min(14, baseRadius * 0.06))
+        .text(`${d.pool}`);
 
-  const hoverGroup = infoItem.append('g')
-    .style('cursor', 'pointer');
+      const hoverGroup = infoItem.append('g')
+        .style('cursor', 'pointer');
 
-  hoverGroup.append('circle')
-    .attr('cx', 0)
-    .attr('cy', 0)
-    .attr('r', Math.min(10, baseRadius * 0.05))
-    .attr('fill', 'transparent');
+      hoverGroup.append('circle')
+        .attr('cx', 0)
+        .attr('cy', 0)
+        .attr('r', Math.min(10, baseRadius * 0.05))
+        .attr('fill', 'transparent');
 
-  hoverGroup.on('mouseover', (event) => {
-    const contractAddress = contractAddresses[d.pool] || 'Not available';
-    tooltip.style('visibility', 'visible')
-      .text(`Contract Address: ${contractAddress}`)
-      .style('left', `${event.layerX + 10}px`)
-      .style('top', `${event.layerY - 25}px`);
-  })
-  .on('mouseout', () => tooltip.style('visibility', 'hidden'));
-});
-  };
+      hoverGroup.on('mouseover', (event) => {
+        const contractAddress = contractAddresses[d.pool] || 'Not available';
+        tooltip.style('visibility', 'visible')
+          .text(`Contract Address: ${contractAddress}`)
+          .style('left', `${event.layerX + 10}px`)
+          .style('top', `${event.layerY - 25}px`);
+      })
+      .on('mouseout', () => tooltip.style('visibility', 'hidden'));
+    });
+      };
 
   useEffect(() => {
     if (!chartRef.current) return;

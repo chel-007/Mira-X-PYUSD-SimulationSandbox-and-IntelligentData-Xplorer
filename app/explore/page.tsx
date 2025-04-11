@@ -14,6 +14,8 @@ import ChartWrapper from "../components/explore/ChartWrapper";
 import SwapVolumeChart from "../components/explore/SwapVolumeChart";
 import PoolMetricsChart from "../components/explore/PoolMetricsChart";
 import { useData } from "../utils/DataProvider";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 
 const Explore = () => {
@@ -200,7 +202,7 @@ const Explore = () => {
           className={activeTab === "adoption" ? styles.activeTab : styles.tab}
           onClick={() => setActiveTab("adoption")}
         >
-        <i class="fa-solid fa-chart-pie-simple"></i>
+        <i className="fa-solid fa-chart-pie-simple"></i>
         </button>
         <button
           className={activeTab === "gas" ? styles.activeTab : styles.tab}
@@ -215,6 +217,18 @@ const Explore = () => {
           <i className="fa-solid fa-square-poll-vertical"></i>
         </button>
       </div>
+                <ToastContainer
+                position="top-right"
+                autoClose={5000}
+                hideProgressBar={false}
+                newestOnTop={false}
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+                style={{ zIndex: 10000 }}
+              />
     </div>
   );
 };
