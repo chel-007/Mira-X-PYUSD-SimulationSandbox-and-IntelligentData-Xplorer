@@ -89,8 +89,8 @@ const styles = \`
       <div className={styles.apiIntro}>
         <h2 className={styles.sectionTitle}>MiraX Connect API</h2>
         <p className={styles.sectionDescription}>
-          Integrate with the MiraX Connect API to access real-time PYUSD transaction data, 
-          gas analysis, and simulation tools. Hosted on robust GCP infrastructure, the API 
+          Integrate with the MiraX Connect API to access real-time PYUSD transaction data and
+          gas analysis tools. Hosted on robust GCP infrastructure, the API 
           empowers developers to build intelligent applications with ease.
         </p>
       </div>

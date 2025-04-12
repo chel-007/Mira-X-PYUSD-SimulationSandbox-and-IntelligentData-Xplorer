@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSimulation, BaseSimulationResult } from '../../utils/SimulationContext'; // Import the types
 import styles from '../../styles/Simulation.module.css';
+import { ethers } from 'ethers';
 
 const SimulationResultBox = ({
   timeOfDay,
@@ -19,7 +20,7 @@ const SimulationResultBox = ({
     const gasUnits = BigInt(gasEstimate);
     const gasPriceWei = BigInt(gasPrice);
     const gasWei = gasUnits * gasPriceWei;
-    const gasEth = Number(gasWei) / 1_000_000_000_000_000_000;
+    const gasEth = Number(ethers.formatEther(gasPriceWei * gasPriceWei));
 
     const now = new Date();
     const currentHour = now.getUTCHours();
@@ -102,41 +103,81 @@ const SimulationResultBox = ({
   const getSwapSuggestions = (result: BaseSimulationResult) => {
     const gasWei = BigInt(result.gasEstimate || '0');
     const gasPriceWei = BigInt(result.gasPrice || '0');
-    const gasEth = Number(gasWei * gasPriceWei) / 1_000_000_000_000_000_000;
+    // const gasEth = Number(gasWei * gasPriceWei) / 1_000_000_000_000_000_000;
+    const gasEth = Number(ethers.formatEther(gasWei * gasPriceWei));
     const amountInNum = parseFloat(result.amountIn || '0');
     const amountOutNum = parseFloat(result.amountOut || '0');
     const slippage = parseFloat(result.slippage?.replace('%', '') || '0');
 
+    // console.log("gas", gasEth)
+
     // console.log("simulation slippage", slippage)
+    const currentDate = new Date(); // 2025-04-12
+    const previousDay = new Date(currentDate);
+    previousDay.setDate(currentDate.getDate() - 1); // 2025-04-11
+    const previousDayStr = previousDay.toISOString().split('T')[0]; // '2025-04-11'
+    
+    // Find the previous day's swap gas fee from gasFeeData
+    const previousDaySwapData = gasFeeData.find(
+      (d) => d.event_date === previousDayStr && d.event_type === 'Swap'
+    );
+    const previousDaySwapGasEth = previousDaySwapData?.avg_gas_fee_eth || 0;
 
-    const currentHour = new Date().getUTCHours();
-    const currentHourData = timeOfDay.find((d) => d.hour_of_day === currentHour);
-    const avgGasFeeEth = currentHourData?.avg_gas_fee_eth || 0;
-    const historicalAvg = timeOfDay.reduce((sum, d) => sum + d.avg_gas_fee_eth, 0) / timeOfDay.length;
-    const isGoodTime = avgGasFeeEth < historicalAvg * 0.9;
+    // console.log("previousday", previousDay)
 
+    // console.log("previousDaySwapDataETh", previousDaySwapGasEth)
+    
+    const mostRecentSwapGasEth = previousDaySwapGasEth || gasFeeData
+      .filter((d) => d.event_type === 'Swap')
+      .sort((a, b) => new Date(b.event_date) - new Date(a.event_date))[0]?.avg_gas_fee_eth || 0;
+    
+    // Determine if it's a good time to swap based on the previous day's swap gas fee
+    const isGoodTime = gasEth < mostRecentSwapGasEth * 0.2; // Current gas fee is less than 20% of the previous day's swap gas fee
+    
+    // console.log("most recernt", mostRecentSwapGasEth)
+    // console.log("isgood", isGoodTime)
+    // Calculate average swap gas fee for efficiency (optional, for reporting)
     const avgSwapGasEth = gasFeeData
       .filter((d) => d.event_type === 'Swap')
-      .reduce((sum, d) => sum + d.avg_gas_fee_eth, 0) / (gasFeeData.length || 1);
+      .reduce((sum, d) => sum + d.avg_gas_fee_eth, 0) / (gasFeeData.filter((d) => d.event_type === 'Swap').length || 1);
     const isEfficient = gasEth < avgSwapGasEth;
 
     const swapValueDiff = amountOutNum - amountInNum;
-    const gasCostImpact = gasEth / Math.abs(swapValueDiff || 1);
-    const isWorthIt = gasCostImpact < 0.05;
+    const gasCostImpact = gasEth / Math.max(Math.abs(swapValueDiff), 1); // Prevent division by zero
+
+    // Dynamically scale the threshold based on amountIn
+    let dynamicThreshold;
+    if (amountInNum < 100) {
+      dynamicThreshold = 0.005; 
+    } else if (amountInNum < 1000) {
+      dynamicThreshold = 0.05;
+    } else {
+      dynamicThreshold = 0.1;
+    }
+    
+    // const swapValueDiff = amountOutNum - amountInNum;
+    // console.log("swapvaluediff", swapValueDiff)
+    // const gasCostImpact = gasEth / Math.abs(swapValueDiff || 1);
+
+    // console.log("gascostimact", gasCostImpact)
+    const isWorthIt = gasCostImpact < dynamicThreshold;
 
     const pool = poolMetricsData.find((p) => p.pool_address.toLowerCase() === result.poolAddress?.toLowerCase());
     const liquidityTrend = pool?.tvl_usd > pool?.total_volume_usd * 2 ? 'stable' : 'volatile';
 
     let suggestion = '';
     if (isGoodTime && slippage < 0.5 && isWorthIt) {
-      suggestion = `Swap now: low gas (${gasEth.toFixed(6)} ETH), low slippage (${slippage}%), and cost-effective!`;
+      suggestion = `Optimal time to swap: low gas (${gasEth.toFixed(6)} ETH), low slippage (${slippage}%), and efficient cost impact (${(gasCostImpact * 100).toFixed(2)}%)`;
     } else if (isGoodTime && isWorthIt) {
-      suggestion = `Swap now: low gas (${gasEth.toFixed(6)} ETH) and worth it, but slippage is ${slippage}%`;
+      suggestion = `Gas is low (${gasEth.toFixed(6)} ETH) and cost impact is good (${(gasCostImpact * 100).toFixed(2)}%), but slippage is high (${slippage}%)`;
+    } else if (isGoodTime && slippage < 0.1) {
+      suggestion = `Low gas and low slippage, but cost impact is high (${(gasCostImpact * 100).toFixed(2)}%).`;
     } else if (liquidityTrend === 'volatile') {
-      suggestion = `Wait: pool liquidity is volatile, gas at ${gasEth.toFixed(6)} ETH`;
+      suggestion = `Pool is volatile (TVL: $${pool?.tvl_usd?.toFixed(2)}, Volume: $${pool?.total_volume_usd?.toFixed(2)}). Consider waiting.`;
     } else {
-      suggestion = `Wait for better conditions: gas (${gasEth.toFixed(6)} ETH) or slippage (${slippage}%) too high`;
+      suggestion = `Not ideal: Gas (${gasEth.toFixed(6)} ETH), slippage (${slippage}%), or cost impact (${(gasCostImpact * 100).toFixed(2)}%) too high.`;
     }
+    
 
     return {
       gasEth: gasEth.toFixed(9),

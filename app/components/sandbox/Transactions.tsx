@@ -155,6 +155,7 @@ const CallNode = ({ data, id, selected }) => {
     if (name.includes('uniswap')) return colors.uniswap;
     if (name.includes('coinbase')) return colors.coinbase;
     if (name.includes('kyberswap')) return colors.kyberswap;
+    if (name.includes('pyusd')) return colors.pyusd;
     if (name === 'usdt') return colors.usdt;
     if (name === 'usdc') return colors.usdc;
     if (name.includes('1inch')) return colors.inch;
@@ -823,62 +824,23 @@ const InputNode = ({ data, id }) => {
 const MockButtonNode = ({ data, id }) => {
   const [loading, setLoading] = useState(false);
   const [isSimulated, setIsSimulated] = useState(false);
+  const [isSwapSimulated, setIsSwapSimulated] = useState(false);
   const [errorState, setErrorState] = useState(false);
   const { simulateTransfer, sendTransfer, simulateSwap, walletClient } = useTransactionSimulation(data.rpcUrl);
   const { setSimulationResult, clearSimulation } = useSimulation();
   const isSwap = data.inputs?.AmountIn;
 
-  const handleApprove = async (tokenAddress: string, poolAddress: string, amountInWei: string) => {
-    // console.log('handleApprove - walletClient:', walletClient);
-    if (!walletClient) {
-      setSimulationResult({ error: 'Wallet not connected' });
-      return;
-    }
-    setLoading(true);
-    try {
-      // Use walletClient.writeContract to send the approve transaction
-      const txHash = await walletClient.writeContract({
-        address: tokenAddress,
-        abi: [
-          {
-            constant: false,
-            inputs: [
-              { name: 'spender', type: 'address' },
-              { name: 'amount', type: 'uint256' },
-            ],
-            name: 'approve',
-            outputs: [{ name: '', type: 'bool' }],
-            type: 'function',
-          },
-        ],
-        functionName: 'approve',
-        args: [poolAddress, amountInWei],
-        account: walletClient.account,
-      });
-  
-      // Wait for the transaction to be mined
-      const provider = new ethers.JsonRpcProvider(data.rpcUrl);
-      const receipt = await provider.waitForTransaction(txHash);
-      if (receipt?.status === 1) {
-        setSimulationResult({ status: 'Approved, please simulate again' });
-      } else {
-        throw new Error('Transaction failed');
-      }
-    } catch (error) {
-      setSimulationResult({ error: `Approval failed: ${(error as Error).message}` });
-      setErrorState(true);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleMock = async () => {
     // console.log('handleMock - walletClient:', walletClient);
-    if (errorState) {
+    if (errorState || isSwapSimulated) {
+      // Reset for a new simulation
       data.clearFlow();
       setErrorState(false);
-      setIsSimulated(false); // Reset for new simulation
+      setIsSimulated(false);
+      setIsSwapSimulated(false); // Reset swap simulation state
       setLoading(false);
+      clearSimulation();
       return;
     }
     setLoading(true);
@@ -902,16 +864,12 @@ const MockButtonNode = ({ data, id }) => {
           inputToken,
           poolMetricsData
         );
-        if ('needsApproval' in result && result.needsApproval) {
-          const approveHandler = () => handleApprove(result.tokenAddress, result.poolAddress, result.amountInWei);
-          console.log('Setting handleApprove:', approveHandler);
-          setSimulationResult({
-            ...result,
-            handleApprove: () => handleApprove(result.tokenAddress, result.poolAddress, result.amountInWei),
-          });
-        } else {
-          setSimulationResult(result);
+          
+        setSimulationResult(result);
+        if (result?.amountOut) {
+          setIsSwapSimulated(true);
         }
+        
         // console.log("simulation result", result)
         // setSimulationResult(result);
         // setNodes((nds) =>
@@ -967,8 +925,8 @@ const MockButtonNode = ({ data, id }) => {
         }}
       >
         {loading ? (
-          <i className="fa-spin fa-spinner" />
-        ) : errorState ? (
+          <i className="fa-solid fa-spinner"></i>
+        ) : errorState || isSwapSimulated ? (
           'Restart'
         ) : isSimulated ? (
           'Send'
@@ -1024,6 +982,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges, setActiveTabMain, mock
   const { ethPrice, loading: ethPriceLoading } = useEthPrice();
   const [mockInputs, setMockInputs] = useState({});
   const [amountNodeId, setAmountNodeId] = useState(null);
+  const [isSwapSimulated, setIsSwapSimulated] = useState(false);
   const [timeline, setTimeline] = useState([]);
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(true);
   const [activeTab, setActiveTab] = useState('timeline');
@@ -1059,6 +1018,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges, setActiveTabMain, mock
     setMockInputs({});
     setTimeline([]);
     setAmountNodeId(null);
+    setIsSwapSimulated(false);
     setFetchingNodeId(null);
     if (typeof resetTrace === 'function' || typeof clearSimulation === 'function') {
       resetTrace();
@@ -1081,7 +1041,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges, setActiveTabMain, mock
   const MOCK_BUTTON_Y_OFFSET = 150;
 
   const handleInputChange = (label, value, nodeId) => {
-    if (!isWalletConnected) {
+    if (!isWalletConnected || isSwapSimulated) {
       return; // Don’t update mockInputs or nodes
     }
     setMockInputs((prev) => {
@@ -1100,7 +1060,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges, setActiveTabMain, mock
   };
 
   const handleFocus = (label, nodeId) => {
-    if (!isWalletConnected) {
+    if (!isWalletConnected || isSwapSimulated) {
       return;
     }
     if (label === 'From' && address) {
@@ -1473,6 +1433,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges, setActiveTabMain, mock
       '0xdac17f958d2ee523a2206206994597c13d831ec7': 'USDT',
       '0x264bd8291fae1d75db2c5f573b07faa6715997b5': 'Paxos 4',
       '0x6c3ea9036406852006290770bedfcaba0e23a0e8': 'PYUSD',
+      '0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9': 'PYUSD Sepolia',
       '0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43': 'Coinbase 10',
       '0x7a250d5630b4cf539739df2c5dacb4c659f2488d': 'Uniswap V2 Router',
       '0xa7ca2c8673bcfa5a26d8ceec2887f2cc2b0db22a': 'Uniswap V3: Nonfungible Position Manager',

@@ -72,12 +72,38 @@ const curvePoolAbi = [
     ],
     outputs: [{ name: '', type: 'uint256' }],
   },
+  {
+    name: 'fee',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'price_oracle',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'i', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'dynamic_fee',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'i', type: 'int128' },
+      { name: 'j', type: 'int128' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  
 ];
 
 export const useTransactionSimulation = (rpcUrl: any) => {
   const { data: walletClient } = useWalletClient();
   // console.log('useTransactionSimulation - walletClient:', walletClient);
   const provider = new JsonRpcProvider(rpcUrl);
+
   const { sendTransaction } = useSendTransaction();
 
   // console.log("rpcurl", rpcUrl)
@@ -95,12 +121,14 @@ export const useTransactionSimulation = (rpcUrl: any) => {
     const balance = BigInt(balanceRaw);
     const amountWei = parseUnits(amount, 6);
 
-    console.log(`Balance: ${balance}, Amount: ${amountWei}`);
+    // console.log("amount", amount)
+
+    // console.log(`Balance: ${balance}, Amount: ${amountWei}`);
     if (balance < amountWei) {
-      throw new Error(`Insufficient PYUSD balance: ${balance} < ${amountWei}`);
+      throw new Error(`Insufficient PYUSD balance: ${balance} < ${amount}`);
     }
 
-    console.log('Simulating transfer...');
+    // console.log('Simulating transfer...');
     const transferTx = {
       from,
       to: contractAddress,
@@ -114,9 +142,14 @@ export const useTransactionSimulation = (rpcUrl: any) => {
 
     const gasEstimate = await provider.estimateGas(transferTx);
   
+    let gasPrice: bigint;
     const gasPriceHex = await provider.send('eth_gasPrice', []);
-    const feeData = await provider.getFeeData(); // v6 method
-    const gasPrice = feeData.gasPrice || BigInt(await provider.send('eth_gasPrice', []));
+    const feeData = await provider.getFeeData();
+    gasPrice = feeData.maxFeePerGas
+      ?? feeData.gasPrice
+      ?? BigInt(await provider.send('eth_gasPrice', []));
+
+    // console.log("feedata, gasprice", feeData, gasPrice, gasEstimate)
   
     const simulationResult = await provider.call(transferTx);
 
@@ -140,23 +173,23 @@ export const useTransactionSimulation = (rpcUrl: any) => {
       args: [to, parseUnits(amount, 6)],
     });
 
-    console.log('Sending transfer to:', to, 'Amount:', amount);
+    // console.log('Sending transfer to:', to, 'Amount:', amount);
 
     const txHash = await walletClient.sendTransaction({
       to: contractAddress,
       data: txData,
       value: 0n,
     });
-    console.log('Transaction sent, hash:', txHash);
+    // console.log('Transaction sent, hash:', txHash);
 
     if (!txHash || typeof txHash !== 'string') {
       throw new Error('Invalid transaction hash: ' + txHash);
     }
 
     // wait using GCP provider
-    const receipt = await provider.waitForTransaction(txHash, 1, 30000);
+    const receipt = await provider.waitForTransaction(txHash, 1, 40000);
     if (!receipt) throw new Error('Transaction receipt not found');
-    console.log('Transaction confirmed, receipt:', receipt);
+    // console.log('Transaction confirmed, receipt:', receipt);
 
     return { txHash: receipt.hash };
   };
@@ -173,6 +206,7 @@ const simulateSwap = async (
   if (!isMainnet) {
     throw new Error('Swap simulation is only supported on Ethereum Mainnet due to pool address limitations.');
   }
+  
 
   const poolConfig = {
     USDC: { address: '0x383e6b4437b59fff47b619cba855ca29342a8559', decimals: 6, tokenAddress: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' },
@@ -189,8 +223,8 @@ const simulateSwap = async (
 
   // Define proxy addresses for each pool
   const proxyAddresses: { [key: string]: string } = {
-    '0x625e92624bc2d88619accc1788365a69767f6200': '0x06cff7088619c7178f5e14f0b119458d08d2f5ef', // crvUSD/PYUSD pool
-    '0x383e6b4437b59fff47b619cba855ca29342a8559': '0x0000000000000000000000000000000000000000', // USDC/PYUSD pool
+    '0x625e92624bc2d88619accc1788365a69767f6200': '0x3fa20eaa107de08b38a8734063d605d5842fe09c', // crvUSD/PYUSD pool
+    '0x383e6b4437b59fff47b619cba855ca29342a8559': '0x9008d19f58aabd9ed0d60971565aa8510560ab41', // USDC/PYUSD pool
   };
 
   const proxyAddress = proxyAddresses[config.address.toLowerCase()];
@@ -201,11 +235,13 @@ const simulateSwap = async (
   // Check allowance for the proxy address
   const tokenContract = new ethers.Contract(tokenContractAddress, erc20Abi, provider);
   const allowance = await tokenContract.allowance(proxyAddress, config.address);
-  console.log("allowance, proxy", allowance.toString(), proxyAddress);
+  // console.log("allowance, proxy", allowance.toString(), proxyAddress);
 
   // Check the proxy's balance for debugging
   const balance = await tokenContract.balanceOf(proxyAddress);
-  console.log("proxy balance", balance.toString(), tokenIn);
+  // console.log("proxy balance", balance.toString(), tokenIn);
+
+  console.log("amountinwei", amountInWei)
 
   // Validate balance
   if (balance < amountInWei) {
@@ -261,14 +297,21 @@ const simulateSwap = async (
   let gasPrice: bigint;
   try {
     const feeData = await provider.getFeeData();
-    gasPrice = feeData.gasPrice || BigInt(await provider.send('eth_gasPrice', []));
+    gasPrice = feeData.maxFeePerGas
+      ?? feeData.gasPrice
+      ?? BigInt(await provider.send('eth_gasPrice', []));
+  
+    // console.log("gasPrice", gasPrice.toString());
   } catch (error) {
-    console.warn('Failed to fetch gas price, using fallback:', error.message);
-    gasPrice = BigInt(20000000000);
+    console.warn("Failed to fetch gas price, using fallback:", error);
+    gasPrice = BigInt(20000000000); // fallback to 20 gwei
   }
+  
 
   // Calculate amount out using get_dy
   const curvePoolContract = new ethers.Contract(config.address, curvePoolAbi, provider);
+
+  // console.log("config.address", config.address)
   let amountOutWei;
   try {
     amountOutWei = await curvePoolContract.get_dy(i, j, amountInWei);
@@ -278,37 +321,56 @@ const simulateSwap = async (
     throw new Error('Unable to calculate output amount');
   }
 
+  // Fetch the pool's fee
+let poolFee;
+try {
+  poolFee = await curvePoolContract.dynamic_fee(i, j);
+  // console.log("pool fee (in basis points)", poolFee.toString());
+} catch (error) {
+  console.warn('Failed to fetch pool fee, using default 0.04%:', error.message);
+  poolFee = BigInt(4000000); // Default to 0.04% (4000000 / 10^10)
+}
+
+  // Calculate the fee multiplier (fee is in 10^10 basis points, e.g., 4000000 = 0.04%)
+  // const FEE_DENOMINATOR = BigInt(10**10);
+  // const feeFraction = poolFee * amountOutWei / FEE_DENOMINATOR;
+  // const adjustedAmountOutWei = amountOutWei - feeFraction;
+  // console.log("adjusted amountOutWei (after fee)", adjustedAmountOutWei.toString());
+
   const outputTokenDecimals = 6; // Output is always PYUSD (6 decimals)
   const amountOutNum = parseFloat(ethers.formatUnits(amountOutWei, outputTokenDecimals));
-
-  // Calculate fee
+  
   const amountInNum = parseFloat(amountIn);
-  const fee = amountInNum - amountOutNum;
-  const feePercentage = (fee / amountInNum) * 100;
+  
+  // Convert BigInt `poolFee` to Number for calculations
+  const fee = Number(poolFee) / 10 ** 10; 
+  const feePercentage = fee * 100;  // Convert fee to percentage
   // console.log("fee calculation", { fee, feePercentage });
-
-  // Slippage calculation with fee as base
+  
   const pool = poolMetricsData.find((p) => p.pool_address.toLowerCase() === config.address.toLowerCase());
+  console.log("pool", pool);
   if (!pool) {
     throw new Error('Pool data not available');
   }
-
+  
   const tvl = pool.tvl_usd;
   const volume24h = pool.total_volume_usd;
   // console.log("pool metrics", { tvl, volume24h });
-
+  
   const amountInUsd = amountInNum;
   const reserveUsd = tvl / 2;
   const priceImpact = amountInUsd / (reserveUsd + amountInUsd);
   const volumeFactor = volume24h / tvl;
+  
+  // now calculate slippage
   let slippage = (feePercentage / 100) + (priceImpact * (1 + volumeFactor));
-  slippage = Math.min(slippage, 0.01); // Cap at 1%
-  // console.log("slippage components", { priceImpact, volumeFactor, slippage });
-
+  slippage = Math.min(slippage, 0.01); // cap at 1%
+  console.log("slippage components", { priceImpact, volumeFactor, slippage });
+  
   const totalGasEstimate = approvalGasEstimate
     ? (approvalGasEstimate + swapGasEstimate).toString()
     : swapGasEstimate.toString();
-
+  
   return {
     gasEstimate: totalGasEstimate,
     gasPrice: gasPrice.toString(),
@@ -320,6 +382,7 @@ const simulateSwap = async (
     feePercentage: feePercentage.toFixed(2) + '%',
     poolAddress: config.address,
   };
+  
 };
 
   return { simulateTransfer, simulateSwap: (from: string, to: string, amountIn: string, isMainnet: boolean, tokenIn: string, poolMetricsData: any[]) =>

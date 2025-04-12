@@ -40,9 +40,19 @@ export const useTransactionTrace = () => {
         }),
       });
       const traceResult = await traceResponse.json();
-      console.log("Trace Result:", traceResult);
+      // console.log("Trace Result:", traceResult.result);
       if (traceResult.error) throw new Error(traceResult.error.message || 'Trace RPC Error');
       setTrace(traceResult.result);
+      if (traceResult.result === null){
+              toast.error("Failed to fetch trace: Transaction not found - ensure you're on the right Network!", {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+              });
+      }
 
       const receiptResponse = await fetch(rpcUrl, {
         method: 'POST',
