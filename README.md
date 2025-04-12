@@ -1,6 +1,5 @@
 
 
-
 ## Mira X Documentation – realTime Edge in PYUSD Transactions
 
 Mira X is an innovative, multidimensional analytics tool designed to deliver real-time insights for both users and developers. Its mission is to accelerate PYUSD stablecoin adoption by making its usage simpler, smarter, cheaper, and impactful across the DeFi and crypto ecosystem.
@@ -11,10 +10,12 @@ let's take a look at *ALL* of its features grounded in its interactive UI Hub:
 MiraX is built around three core features:
 
 **Explore** — track and visualize PYUSD ***adoption trends*** in real-time.
+
 **Simulate** — ***optimize your PYUSD transactions*** in a risk-free sandbox.
+
 **Connect** — plug into MiraX’s self-hosted *Data Provider* to build smart, data-driven apps.
 
-#### Explore: 
+### Explore: 
 the Explore feature delivers actionable insights into PYUSD adoption and performance within the DeFi ecosystem. key highlights include:
 -   **Adoption Metrics**: tracks PYUSD usage trends and growth.
 -   **Transaction Analysis**: breaks down gas costs for swaps and transfers, highlighting PYUSD’s contribution to Ethereum network congestion via hourly average gas consumption.
@@ -24,7 +25,7 @@ The *Intelligent Data Explorer* combines historical & real-time **pyusd** data p
 
 <hr>
 
-#### Sandbox:
+### Sandbox:
 the *Sandbox* feature lets you simulate and analyze PYUSD transactions by interacting with ***smart contracts***, *transaction hashes*, and ***historical logs stored in BigQuery***. *3 major features* of Mira X sandbox includes:
 
 **Exploring Trace Level** details of PYUSD transactions on Ethereum Mainnet and Sepolia. Powered by GCP Blockchain RPC, this feature ***replays transactions*** on an interactive, flow-like canvas, mapping out how each node (call) connects. Users can uncover:
@@ -60,7 +61,7 @@ the mocking feature can be initiated from the ***Transaction Trace Canvas*** or 
 
 <hr>
 
-**Mirax Connect API**
+### **Mirax Connect API**
 
 > details on the Connect feature, also known as the MiraX Connect API
 
