@@ -1,8 +1,6 @@
 // import { request, gql } from 'graphql-request';
 import { NextResponse } from 'next/server';
 
-const subgraphUrl = 'https://gateway.thegraph.com/api/57e9956c0fb785721d6c7141d45346f4/subgraphs/id/apikey';
-
 // export async function POST(req: Request) {
 //   const { owner, pool } = await req.json();
 //   const query = gql`
