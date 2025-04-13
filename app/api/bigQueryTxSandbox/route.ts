@@ -46,11 +46,11 @@ export async function GET(request: NextRequest) {
   ]);
   const latestTxMs = txLatest[0]?.latest_timestamp || Date.now();
   const latestGasSec = gasLatest[0]?.latest_timestamp || Math.floor(Date.now() / 1000);
-  const latestTimestampMs = Math.max(latestTxMs, latestGasSec * 1000); // Use latest from either table
+  const latestTimestampMs = Math.max(latestTxMs, latestGasSec * 1000);
 
   const endDate = new Date(latestTimestampMs);
   const startDate = new Date(endDate);
-  startDate.setDate(endDate.getDate() - 6); // 7-day range
+  startDate.setDate(endDate.getDate() - 6);
 
   // Generate 7-day range
   const dates = Array.from({ length: 7 }, (_, i) => {
@@ -122,7 +122,7 @@ const gasOptions = {
   }
 
   // Process gas rows
-for (const row of gasRows[0]) {
+  for (const row of gasRows[0]) {
     const txDate = new Date(row.tx_date.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const dayIndex = dates.indexOf(txDate);
     if (dayIndex !== -1) {
