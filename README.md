@@ -188,10 +188,10 @@ The Sandbox is structured into three key sections: *Transactions*, *Wallets*, an
 <table>
   <tr>
     <td>
-      <img src="images/get_dy.png" alt="get_dy" width="300"/> 
+      <img src="images/get_dy.png" alt="get_dy" width="400"/> 
     </td>
     <td>
-      <img src="images/balance_of.png" alt="volatility" width="300"/>
+      <img src="images/balance_of.png" alt="volatility" width="400"/>
     </td>
     </tr>
 </table>
@@ -220,9 +220,16 @@ The Sandbox is structured into three key sections: *Transactions*, *Wallets*, an
 ### Extra Resources - to Operate Mira X
 - [pyusd-websocket **deployed on Fly.io**](https://github.com/chel-007/pyusd-websocket-for-mira-x/blob/master/index.js)
 
-- to fully test the Wallets tab — including High Activity status, active balances, and Staking in Pools — you can mock the following proxy addresses known for rich activity:
- - 0x9008d19f58aabd9ed0d60971565aa8510560ab41
- - 0x264bd8291fAE1D75DB2c5F573b07faA6715997B5 (Official Paxos 4)
+- to fully test the Wallets tab — including High Activity status, active balances, and Staking in Pools — you can mock the following proxy addresses:
+    * 0x9008d19f58aabd9ed0d60971565aa8510560ab41
+    * 0x264bd8291fAE1D75DB2c5F573b07faA6715997B5 (Official Paxos 4)
+
+- Mira X mini Telegram Bot App [deployed to firebase](https://mirax-pyusd-insights.web.app/), source code [here](/mirax-mini-app/)
+
+- Mira X Connect API, source code [here](/mirax-connect-api/), deployed to GCP Cloud Run
+
+
+### How to use MiraX - Video
 
 
 
