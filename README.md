@@ -151,7 +151,7 @@ The API is designed for developers building smart payment solutions and DeFi PYU
 
 - with the frontend integrated, a cloud function `sync-to-bigQuery` *runs every 6 hours*. It checks if either Firestore collection exceeds **500 docs**, if so, it **inserts unique events** into their respective BigQuery tables and deletes the synced docs.
 
-![sync-to-bq](images/sync-to-bq.png)
+![sync-to-bq](images/sync_to_bq.png)
 
 - when a sync occurs, the **Data Provider detects it automatically**, triggers a *BigQuery refresh*, and updates the charts seamlessly **without reloading the app**.
 
@@ -180,6 +180,22 @@ The Sandbox is structured into three key sections: *Transactions*, *Wallets*, an
 
 - **in the Mock Tx flow**,  you can simulate a Transfer or Swap transaction by filling in the inputs. sending the simulation triggers the `useTransactionSimulation` component, which creates accurate contract ABI for methods like **transfer**, **approve**, **balanceOf**, **exchange**, **dynamic_fee**, and **get_dy**. These methods interact with the smart contracts (1) *as if it were a real transaction* and (2) *to obtain accurate simulation results*
 
+<!-- ![balance_of_mock_tx](images/balance_of_mock_tx.png)
+
+![get_dy](images/get_dy.png) -->
+
+
+<table>
+  <tr>
+    <td>
+      <img src="images/get_dy.png" alt="get_dy" width="300"/> 
+    </td>
+    <td>
+      <img src="images/balance_of.png" alt="volatility" width="300"/>
+    </td>
+    </tr>
+</table>
+
 
 - Ethers is used to ***encode the contract information*** with **GCP RPC** acting as the provider, dynamically switching between **mainnet** and **sepolia**
 
@@ -188,18 +204,25 @@ The Sandbox is structured into three key sections: *Transactions*, *Wallets*, an
 <hr>
 
 - *in the Wallets tab*, the connected/effective address is passed to a separate API route (distinct from the Data Provider), which filters for transactions where the ***sender or receiver*** is the effective address and provides a ***gas summary*** where the ***from, to, or args*** contain the passed address
+
 - wallets includes additional features such as *PYUSD* *balance reports*, *activity levels*, and *scoring*. It also provides a ***Staking dashboard*** that shows the amount of *staked LP tokens* in MiraX-tracked pools (**py/crv USD & PayPool**), it displays this in a concentric pie chart, along with the APR and TVL of respective pools.
+
+![wallet_features](images/wallet_features.png)
 
 <hr>
 
 **Developers: STEP 5**
-* **finally, The Developers tab** introduces the MiraX Connect API, offering integration steps for developers, along with a working example in the form of a mini Telegram Bot App. [@MiraXInsightsBot](fhhf)
+* **finally, The Developers tab** introduces the MiraX Connect API, offering integration steps for developers, along with a working example in the form of a mini Telegram Bot App. [@MiraXInsightsBot](https://t.me/MiraXInsightsBot)
 
 <hr>
 
 
-### Extra Resources - to Fully test MiraX
-- 
+### Extra Resources - to Operate Mira X
+- [pyusd-websocket **deployed on Fly.io**](https://github.com/chel-007/pyusd-websocket-for-mira-x/blob/master/index.js)
+
+- to fully test the Wallets tab — including High Activity status, active balances, and Staking in Pools — you can mock the following proxy addresses known for rich activity:
+ - 0x9008d19f58aabd9ed0d60971565aa8510560ab41
+ - 0x264bd8291fAE1D75DB2c5F573b07faA6715997B5 (Official Paxos 4)
 
 
 
