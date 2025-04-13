@@ -2,16 +2,18 @@
 
 Mira X is an innovative, multidimensional analytics tool designed to deliver real-time insights for both users and developers. Its mission is to accelerate PYUSD stablecoin adoption by making its usage simpler, smarter, cheaper, and impactful across the DeFi and crypto ecosystem.
 
-***access webapp here: **https://mira-x.netlify.app/*****
-
 
 let's take a look at *ALL* of its features grounded in its interactive UI Hub:
 ### Features of MiraX
 MiraX is built around three core features:
 
 **Explore** — track and visualize PYUSD ***adoption trends*** in real-time.
+
 **Simulate** — ***optimize your PYUSD transactions*** in a risk-free sandbox.
+
 **Connect** — plug into MiraX’s self-hosted *Data Provider* to build smart, data-driven apps.
+
+![mirax-features](images/mirax-features.png)
 
 <hr>
 
@@ -23,7 +25,6 @@ the Explore feature delivers actionable insights into PYUSD adoption and perform
 
 The *Intelligent Data Explorer* combines historical & real-time **pyusd** data powered by a GCP Blockchain RPC Websocket. it works seamlessly with MiraX's BigQuery database and Cloud Run containers which schedule periodic syncs of this data to the cloud, while ensuring the frontend maintains its subscription to Firestore for continuous data updates.
 
-**NB: u can proceed to  detailed_integration_steps  here**
 
 <hr>
 
@@ -77,9 +78,13 @@ The API is designed for developers building smart payment solutions and DeFi PYU
 
 <hr>
 
+***Access Webapp here: **https://mira-x.netlify.app/*****
+
+<hr>
+
 ### Tech Stack Used for Mira X
--   Next.js & Typescript
-- D3.js (interactive charts)
+- Next.js & Typescript
+- D3.js & GSAP (interactive charts n animations)
 - Xyflow (sandbox canvas)
 - GCP (BigQuery, Firestore, Blockchain RPC, Cloud Run)
 - third party APIs n Services (coingecko, curve finance, fly.io)
@@ -91,7 +96,7 @@ The API is designed for developers building smart payment solutions and DeFi PYU
 **STEP 1: Setting Up Data Backfill W/ BigQuery**
 - the first step was building the data backend. The bounty provided access to the **GCP-maintained Ethereum Crypto dataset on BigQuery**, which I used to perform a thorough *historical backfill* of PYUSD-related data
 - while blockchain RPCs *can* be used to fetch past data, they’re better optimized for **real-time subscriptions** than large-scale backfills, making BigQuery the ideal solution for this step.
-- by querying the `bigquery-public-data.goog_blockchain_ethereum_mainnet_us` dataset, i was able to backfill ***PYUSD*** transaction history into two distinct tables - ***transfer_logs*** & ***lp_activity_and_gas***. take a look at the method used in [*this script*](fgfgf)
+- by querying the `bigquery-public-data.goog_blockchain_ethereum_mainnet_us` dataset, i was able to backfill ***PYUSD*** transaction history into two distinct tables - ***transfer_logs*** & ***lp_activity_and_gas***. take a look at the method used in [*this script*](app/componets/explore/backFillData/BigQueryBackfill.py) and [*this too*](app/componets/explore/backFillData/BigQueryBackfillGas.py)
 
 - the *transfer_logs table* contains all standard PYUSD transaction data, ***excluding internal contract calls*** that could skew the results. to ensure only valid `Transfer` events were captured, I filtered transactions *using a safe topic offset*: **`0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef`** which corresponds to the Transfer event_signature. 
 - this method is a reliable way to extract actual transaction data, ***why?*** - because almost every on-chain event whether it's a **token swap**, **bridge transfer**, or **direct transfer**—**emits a `Transfer` event** as part of the process.
@@ -152,14 +157,13 @@ The Sandbox is structured into three key sections: *Transactions*, *Wallets*, an
 <hr>
 
 **Developers: STEP 5**
-* **finally, The Developers tab** introduces the MiraX Connect API, offering integration steps for developers, along with a working example in the form of a mini Telegram Bot App. [@MiraXInsights](fhhf)
+* **finally, The Developers tab** introduces the MiraX Connect API, offering integration steps for developers, along with a working example in the form of a mini Telegram Bot App. [@MiraXInsightsBot](fhhf)
 
 <hr>
 
 
-
-
-
+### Extra Resources - to Fully test MiraX
+- 
 
 
 

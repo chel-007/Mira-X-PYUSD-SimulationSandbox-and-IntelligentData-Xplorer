@@ -40,7 +40,7 @@ export const useTransactionTrace = () => {
         }),
       });
       const traceResult = await traceResponse.json();
-      // console.log("Trace Result:", traceResult.result);
+      console.log("Trace Result:", traceResult.result);
       if (traceResult.error) throw new Error(traceResult.error.message || 'Trace RPC Error');
       setTrace(traceResult.result);
       if (traceResult.result === null){
@@ -65,7 +65,7 @@ export const useTransactionTrace = () => {
         }),
       });
       const receiptResult = await receiptResponse.json();
-      console.log("Receipt Result:", receiptResult);
+      // console.log("Receipt Result:", receiptResult);
       if (receiptResult.error) throw new Error(receiptResult.error.message || 'Receipt RPC Error');
       setReceipt(receiptResult.result);
 

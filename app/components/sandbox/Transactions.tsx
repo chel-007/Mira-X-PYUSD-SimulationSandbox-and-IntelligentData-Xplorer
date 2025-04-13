@@ -144,6 +144,10 @@ const CallNode = ({ data, id, selected }) => {
     inch: { bg: '#7F00FF', border: '#7F00FF' },
     mev: { bg: '#FF4500', border: '#CC3700' },
     mimic: { bg: '#bdbcb9', border: '#807f7c' },
+    ondo: { bg: '#132A60', border: '#1A2A55' },
+    chainlink: { bg: '#0A258A', border: '#0A258A' },
+    pepe: { bg: '#069420', border: '#069420' },
+    onyx: { bg: '#353839', border: '#353935' },
     aave: { bg: '#2EBAC6', border: '#1A7A84' },
     unknown: { bg: '#333', border: '#fff' },
   };
@@ -161,6 +165,10 @@ const CallNode = ({ data, id, selected }) => {
     if (name.includes('1inch')) return colors.inch;
     if (name.includes('mev')) return colors.mev;
     if (name.includes('mimic')) return colors.mimic;
+    if (name.includes('ondo')) return colors.ondo;
+    if (name.includes('chainlink')) return colors.chainlink;
+    if (name.includes('pepe')) return colors.pepe;
+    if (name.includes('onyx')) return colors.onyx;
     if (name.includes('aave')) return colors.aave;
     return colors.unknown;
   };
@@ -209,24 +217,24 @@ const CallNode = ({ data, id, selected }) => {
 
       {useTreeStyle ? (
         <div style={{ display: 'flex', alignItems: 'center' }}>
-{data.hasSubcalls && (
-  <button
-    onClick={(e) => {
-      e.stopPropagation(); // Prevent click from bubbling up to React Flow
-      toggleCollapse();
-    }}
-    onMouseDown={(e) => e.stopPropagation()} // Prevent mousedown from bubbling up, allowing dragging
-    style={{
-      marginRight: '5px',
-      background: 'none',
-      border: 'none',
-      color: '#fff',
-      fontSize: '14px',
-    }}
-  >
-    {data.collapsed ? '▶' : '▼'}
-  </button>
-)}
+        {data.hasSubcalls && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent click from bubbling up to React Flow
+              toggleCollapse();
+            }}
+            onMouseDown={(e) => e.stopPropagation()} // Prevent mousedown from bubbling up, allowing dragging
+            style={{
+              marginRight: '5px',
+              background: 'none',
+              border: 'none',
+              color: '#fff',
+              fontSize: '14px',
+            }}
+          >
+            {data.collapsed ? '▶' : '▼'}
+          </button>
+        )}
           <strong>{data.type || 'Call'}</strong>
         </div>
       ) : (
@@ -575,6 +583,10 @@ const parseTrace = (trace, parentId, position, contractNames = {}, depth = 0, to
     if (name === 'Uniswap V3: Swap Router 02') {
       return 'Uniswap V3: Swap Router';
     }
+    if (name === 'Aave: variableDebtEthPYUSD Token') {
+      return 'Aave: ethPYUSD Debt Token';
+    }
+    
     return name;
   };
 
@@ -1433,8 +1445,9 @@ const Transactions = ({ setNodes, setEdges, nodes, edges, setActiveTabMain, mock
       '0xdac17f958d2ee523a2206206994597c13d831ec7': 'USDT',
       '0x264bd8291fae1d75db2c5f573b07faa6715997b5': 'Paxos 4',
       '0x6c3ea9036406852006290770bedfcaba0e23a0e8': 'PYUSD',
-      '0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9': 'PYUSD Sepolia',
+      '0xcac524bca292aaade2df8a05cc58f0a65b1b3bb9': 'PYUSD Sepolia',
       '0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43': 'Coinbase 10',
+      '0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf': 'Coinbase: cbBTC Token',
       '0x7a250d5630b4cf539739df2c5dacb4c659f2488d': 'Uniswap V2 Router',
       '0xa7ca2c8673bcfa5a26d8ceec2887f2cc2b0db22a': 'Uniswap V3: Nonfungible Position Manager',
       '0x1111111254eeb25477b68fb85ed929f73a960582': '1inch v5: Aggregation Router',
@@ -1443,9 +1456,16 @@ const Transactions = ({ setNodes, setEdges, nodes, edges, setActiveTabMain, mock
       '0xc30c8b862f7de6ba5d7eaeb113c78ec6b5ded04b': 'Uniswap V3: Swap Router 02',
       '0xdef1c0ded9bec7f1a1670819833240f027b25eff': '0x Exchange Proxy',
       '0x9008d19f58aabd9ed0d60971565aa8510560ab41': 'KyberSwap',
-      '0x3e88c9b0e3be6817973a6e629211e702d12c577f': 'Aave: Pool V3',
+      '0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2': 'Aave: Pool V3',
+      '0x57b67e4de077085fd0af2174e9c14871be664546': 'Aave: variableDebtEthPYUSD Token',
+      '0x0c0d01abf3e6adfca0989ebba9d6e85dd58eab1e': 'Aave: aEthPYUSD Token',
+      '0x8164cc65827dcfe994ab23944cbc90e0aa80bfcb': 'Aave: Incentives V3',
       '0x00000000000000adc04c56bf30ac9d3c0aaf14dc': 'Seaport (OpenSea)',
       '0x0000000000a39bb272e79075ade125fd351887ac': 'Blur Pool',
+      '0xfaba6f8e4a5e8ab82f62fe7c39859fa577269be3': 'Ondo Finance: ONDO Token',
+      '0x514910771af9ca656af840dff83e8264ecf986ca': 'Chainlink: LINK Token',
+      '0x6982508145454ce325ddbe47a25d4ec3d2311933': 'Pepe: PEPE Token',
+      '0xa2cd3d43c775978a96bdbf12d733d5a1ed94fb18': 'Onyx Protocol: XCN Token',
       '0x00000000009E50a7dDb7a7B0e2ee6604fd120E49': 'MEV Bot (Common on Curve Swaps)',
       '0x000000000000000000000000000000000000dead': 'MEV Bot (Burner)',
       '0x0000000000007f150bd6f54c40a34d7c3d5e9f56': 'MEV Bot (Common)',
@@ -1596,25 +1616,30 @@ setEdges((eds) => {
       setCenter(endX, endY, { zoom: 1.0, duration: 500 });
     }, 100);
   };
-  
 
   const TimelineRow = ({ index, style }) => {
     const step = timeline[index];
     const is1inchV5 = step.label?.includes('1inch');
     const isUsdt = step.label?.includes('USDT');
     const isUsdc = step.label?.includes('USDC');
-    const isUniswap = step.label?.includes('uniswap');
-    const isCoinbase = step.label?.includes('coinbase');
-    const isKyberswap = step.label?.includes('kyberswap');
-    const isMimic = step.label?.includes('mimic');
-    const isAave = step.label?.includes('aave');
+    const isUniswap = step.label?.includes('Uniswap');
+    const isCoinbase = step.label?.includes('Coinbase');
+    const isKyberswap = step.label?.includes('Kyberswap');
+    const isMimic = step.label?.includes('Mimic');
+    const isAave = step.label?.includes('Aave');
     const isMev = step.label?.includes('mev');
+    const isOndo = step.label?.includes('Ondo');
+    const isChainlink = step.label?.includes('Chainlink');
+    const isPepe = step.label?.includes('Pepe');
+    const isOnyx = step.label?.includes('Onyx')
     return (
       <div
         style={{
           ...style,
           cursor: 'pointer',
-          color: is1inchV5 ? '#9B59B6' : isUsdt ? '#26A17B': isUsdc ? '#FF69B4': isMimic ? '#2EBAC6': isAave ? '#bdbcb9': isUniswap ? '#FF69B4': isCoinbase ? '#0052FF': isKyberswap ? '#31CB9E': isMev ? '#FF4500':
+          color: is1inchV5 ? '#9B59B6' : isUsdt ? '#26A17B': isUsdc ? '#00A3D6': isMimic ? '#bdbcb9': isAave ? '#2EBAC6':
+           isUniswap ? '#FF69B4': isCoinbase ? '#0052FF': isKyberswap ? '#31CB9E': isMev ? '#FF4500': isOndo ? '#132A60':
+           isChainlink ? '#0A258A': isPepe ? '#069420': isOnyx ? '#353839':
           step.isPyusd ? 'rgba(0, 102, 204)' : step.isKnown ? '#818499' : '#818499',
           margin: '5px 0',
           padding: step.isDot ? '0' : '5px',
@@ -1646,6 +1671,8 @@ setEdges((eds) => {
       '0xa9059cbb': 'Transfer',
       '0x23b872dd': 'TransferFrom',
       '0x095ea7b3': 'Approve',
+      '0x66188463': 'Decrease Approval',
+      '0xd73dd623': 'Increase Approval',
       '0xdd62ed3e': 'Allowance',
       '0x5af547e6': 'Collect',
       '0x2e1a7d4d': 'Withdraw',
@@ -1656,8 +1683,12 @@ setEdges((eds) => {
       '0x70a08231': 'BalanceOf',
       '0x37e0ac02': 'ExecuteOperation',
       '0xa231a780': 'ExecuteOperation',
-      '0xe449022e': 'uniswapV3Swap',
-      '0x128acb08': 'Multicall'
+      '0xe449022e': 'Uniswap V3 Swap',
+      '0x128acb08': 'Multicall',
+      '0x573ade81': 'Repay: Aave',
+      '0x6fd97676': 'Handle Repayment: Aave',
+      '0x31873e2e': 'Handle Action: Aave',
+      '0xf5298aca': 'Burn'
     };
     return signatures[signature] || 'Custom Call';
   };
@@ -1814,20 +1845,20 @@ setEdges((eds) => {
                 {TimelineRow}
               </FixedSizeList>
             )}
-{activeTab === 'nodeTickler' && (
-  <div style={{ color: '#fff', padding: '10px', borderRadius: '10px', fontSize: '14px' }}>
-    {selectedNode ? (
-      <>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', fontSize: '13px' }}>
-          <div
-            style={{
-              width: '20px',
-              height: '20px',
-              borderRadius: '50%',
-              background: selectedNode.data.callDepthColor,
-              marginRight: '10px',
-            }}
-          />
+            {activeTab === 'nodeTickler' && (
+              <div style={{ color: '#fff', padding: '10px', borderRadius: '10px', fontSize: '14px' }}>
+              {selectedNode ? (
+                <>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', fontSize: '13px' }}>
+                <div
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  borderRadius: '50%',
+                  background: selectedNode.data.callDepthColor,
+                  marginRight: '10px',
+                }}
+              />
           <h3>{selectedNode.data.contractName || 'Unknown'}</h3>
         </div>
         <p>Role: {decodeInput(selectedNode.data.input)}</p>
@@ -1848,24 +1879,24 @@ setEdges((eds) => {
                       (parentNode.data.to ? `${parentNode.data.to.slice(0, 6)}...` : 'Unknown')
                     : 'Unknown (Parent Not Found)';
                 })()}
-          </p>
-          <p>
-            Callees:{' '}
-            {edges
-              .filter((e) => e.source === selectedNode.id)
-              .map((e) => {
-                const targetNode = nodes.find((n) => n.id === e.target);
-                return targetNode?.data.contractName || (targetNode?.data.to ? `${targetNode.data.to.slice(0, 6)}...` : 'Unknown');
-              })
-              .join(', ') || 'None'}
-          </p>
-        </div>
-      </>
-    ) : (
-      <p>Select a node from the timeline or graph</p>
-    )}
-  </div>
-)}
+              </p>
+                      <p>
+                        Callees:{' '}
+                        {edges
+                          .filter((e) => e.source === selectedNode.id)
+                          .map((e) => {
+                            const targetNode = nodes.find((n) => n.id === e.target);
+                            return targetNode?.data.contractName || (targetNode?.data.to ? `${targetNode.data.to.slice(0, 6)}...` : 'Unknown');
+                          })
+                          .join(', ') || 'None'}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <p>Select a node from the timeline or graph</p>
+                )}
+              </div>
+            )}
             {activeTab === 'digDeeper' && (
               <div style={{ color: '#fff', padding: '10px' }}>
                 <button

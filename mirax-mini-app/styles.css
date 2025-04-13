@@ -13,8 +13,8 @@ h1 {
 }
 
 #insights {
-  max-width: 800px; /* Optional: limits width for readability */
-  margin: 0 auto; /* Centers the container */
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 .insight-box {
@@ -22,15 +22,15 @@ h1 {
   padding: 15px;
   border-radius: 5px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  margin-bottom: 20px; /* Space between boxes */
-  border: 1px solid #ddd; /* Subtle border */
+  margin-bottom: 20px; 
+  border: 1px solid #ddd;
 }
 
 .insight-box h2 {
   font-family: "Red Rose", serif;
   font-size: 18px;
   margin: 0 0 10px 0;
-  color: #444; /* Slightly darker for contrast */
+  color: #444;
 }
 
 .insight-box p {

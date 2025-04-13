@@ -227,7 +227,7 @@ const Explore = () => {
                 pauseOnFocusLoss
                 draggable
                 pauseOnHover
-                style={{ zIndex: 10000 }}
+                style={{ zIndex: 10000, top: 70 }}
               />
     </div>
   );

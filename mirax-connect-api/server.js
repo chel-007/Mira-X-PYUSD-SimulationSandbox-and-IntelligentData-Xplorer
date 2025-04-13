@@ -32,9 +32,9 @@ try {
 const collectionName = process.env.FIRESTORE_COLLECTION;
 const REQUIRED_TOKEN = process.env.REQUIRED_TOKEN;
 
-console.log('Initializing server with projectId:', projectId);
-console.log('Firestore collection:', collectionName);
-console.log('Required token:', REQUIRED_TOKEN);
+// console.log('Initializing server with projectId:', projectId);
+// console.log('Firestore collection:', collectionName);
+// console.log('Required token:', REQUIRED_TOKEN);
 
 // Cache for BigQuery data
 let cachedData = {
@@ -50,6 +50,7 @@ const clients = new Set();
 const gasComparisonQuery = `
     SELECT
       DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) AS event_date,
+      EXTRACT(HOUR FROM TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) AS hour_of_day,
       event_type,
       AVG(CAST(gas_used AS INT64) * CAST(gas_price AS BIGNUMERIC) / 1e18) AS avg_gas_fee_eth,
       COUNT(DISTINCT tx_hash) AS transaction_count,
@@ -57,9 +58,9 @@ const gasComparisonQuery = `
     FROM \`${projectId}.pyusd_data.lp_activity_and_gas_latest\`
     WHERE event_type IN ('Transfer', 'Swap')
       AND DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) >= DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY)
-      AND DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) < CURRENT_DATE()
-    GROUP BY event_date, event_type
-    ORDER BY event_date, event_type
+      AND DATE(TIMESTAMP_SECONDS(CAST(block_timestamp AS INT64))) <= CURRENT_DATE()
+    GROUP BY event_date, hour_of_day, event_type
+    ORDER BY event_date, hour_of_day, event_type
 `;
 const timeOfDayQuery = `
     SELECT
@@ -152,10 +153,19 @@ function updateInsights(realTimeData) {
     fetchBigQueryData();
   }
 
+  const now = new Date();
   const oneHourAgo = Math.floor((Date.now() - 60 * 60 * 1000) / 1000);
+  const currentDate = now.toISOString().split('T')[0];
+  const currentHour = now.getUTCHours();
+  
   const recentBigQueryTx = cachedData.gasFeeData
-    .filter((d) => new Date(d.event_date).getTime() / 1000 >= oneHourAgo)
-    .reduce((sum, d) => sum + d.transaction_count, 0);
+  .filter((d) => {
+    const rowDate = d.event_date;
+    const rowHour = d.hour_of_day;
+    return rowDate === currentDate && rowHour === currentHour;
+  })
+  .reduce((sum, d) => sum + d.transaction_count, 0);
+
   const recentFirestoreTx = realTimeData.filter((d) => d.block_timestamp >= oneHourAgo).length;
   cachedData.txPerHour = recentBigQueryTx + recentFirestoreTx;
 
@@ -278,7 +288,6 @@ const poolNames = {
   '0x383e6b4437b59fff47b619cba855ca29342a8559': 'Curve PayPool'
 };
 
-// Function to truncate address
 const truncateAddress = (address) => {
   if (!address || address === 'N/A') return 'N/A';
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
