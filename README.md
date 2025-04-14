@@ -78,10 +78,6 @@ The API is designed for developers building smart payment solutions and DeFi PYU
 
 <hr>
 
-***Access Webapp here: **https://mira-x.netlify.app/*****
-
-<hr>
-
 ### Tech Stack Used for Mira X
 - Next.js & Typescript
 - D3.js & GSAP (interactive charts n animations)
@@ -89,6 +85,9 @@ The API is designed for developers building smart payment solutions and DeFi PYU
 - GCP (BigQuery, Firestore, Blockchain RPC, Cloud Run)
 - third party APIs n Services (coingecko, curve finance, fly.io)
 - wallet connection (wagmi, ethers, reown)
+
+
+***Access Webapp here: **https://mira-x.netlify.app/*****
 
 <hr>
 
@@ -164,9 +163,9 @@ The Sandbox is structured into three key sections: *Transactions*, *Wallets*, an
 
 - integrating **XYFlow** (prev. React Flow) into the Transactions tab was key to delivering a ***cutting-edge, intuitive canvas UI***. you can *zoom, pan, lock interactions, reset views, copy* all within the Sandbox
 
-- One pitfall of using React Flow is **browser memory usage**. I sidestepped this by optimizing the Sandbox with ***virtualization*** (disabling rendering for off-viewport nodes) and *leveraging Lodash debounce* to throttle updates.
+- One pitfall of using React Flow is **high browser memory usage**. I sidestepped this by optimizing the Sandbox with ***virtualization*** (disabling rendering for off-viewport nodes) and *leveraging Lodash debounce* to throttle updates.
 
-- with support for both Ethereum Mainnet and Sepolia, **Wagmi** helps detect the connected network (***chainId***) which determines which interactions you can make.
+- with support for both Ethereum Mainnet and Sepolia, **Wagmi** helps detect the connected network (***chainId***) that determines which interactions you can make.
 
 - **in the Add Tx flow**, submitting a transaction hash triggers ***GCP RPC debug_traceTransaction*** alongside *getTransactionReceipt*. The resulting data is parsed into **XYFlow nodes**, with *Edges (Handles)* created for each connecting node.
 
@@ -188,10 +187,10 @@ The Sandbox is structured into three key sections: *Transactions*, *Wallets*, an
 <table>
   <tr>
     <td>
-      <img src="images/get_dy.png" alt="get_dy" width="400"/> 
+      <img src="images/get_dy.png" alt="get_dy" width="450"/> 
     </td>
     <td>
-      <img src="images/balance_of.png" alt="volatility" width="400"/>
+      <img src="images/balance_of.png" alt="volatility" width="450"/>
     </td>
     </tr>
 </table>
@@ -217,16 +216,24 @@ The Sandbox is structured into three key sections: *Transactions*, *Wallets*, an
 <hr>
 
 
-### Extra Resources - to Operate Mira X
+### Extra Setup Resources - to Operate Mira X
 - [pyusd-websocket **deployed on Fly.io**](https://github.com/chel-007/pyusd-websocket-for-mira-x/blob/master/index.js)
+
+- to fully test the Simulation flow, you can obtain testnet PYUSD from Paxos Faucet here [https://faucet.paxos.com/](https://faucet.paxos.com/) & Run on Sepolia Network
 
 - to fully test the Wallets tab — including High Activity status, active balances, and Staking in Pools — you can mock the following proxy addresses:
     * 0x9008d19f58aabd9ed0d60971565aa8510560ab41
     * 0x264bd8291fAE1D75DB2c5F573b07faA6715997B5 (Official Paxos 4)
 
-- Mira X mini Telegram Bot App [deployed to firebase](https://mirax-pyusd-insights.web.app/), source code [here](/mirax-mini-app/)
+- most PYUSD transactions are fun to explore in the Sandbox, but if you want to try one of the best I've come across so far, check this out:
+    * 0x0385ceeb3d37f51323b3754b8eeaf306d81f3c66fbc8a1dc3070c8ea0bdb8e90
 
-- Mira X Connect API, source code [here](/mirax-connect-api/), deployed to GCP Cloud Run
+- Mira X mini Telegram Bot App [deployed to firebase](https://mirax-pyusd-insights.web.app/), source code [here](/mirax-mini-app/). *basically, you must deploy your app before you can convert it into a telegram Bot*
+
+- MiraX Connect API, source code [here](/mirax-connect-api/), deployed to GCP Cloud Run. 
+
+
+> Disclaimer: The Swap Simulation in the MiraX Sandbox (*Mock TX flow*) uses proxy addresses that hold actual balances and allowances across Curve Finance pools. This setup is designed to demonstrate the full feature for the bounty without requiring the use of real tokens, spending real gas, or exposing personal wallet data.
 
 
 ### How to use MiraX - Video
