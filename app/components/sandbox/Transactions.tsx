@@ -149,7 +149,7 @@ const CallNode = ({ data, id, selected }) => {
     pepe: { bg: '#069420', border: '#069420' },
     onyx: { bg: '#353839', border: '#353935' },
     aave: { bg: '#2EBAC6', border: '#1A7A84' },
-    unknown: { bg: '#333', border: '#fff' },
+    unknown: { bg: '#4B5563', border: '#fff' },
   };
 
   const getColor = () => {
@@ -159,7 +159,7 @@ const CallNode = ({ data, id, selected }) => {
     if (name.includes('uniswap')) return colors.uniswap;
     if (name.includes('coinbase')) return colors.coinbase;
     if (name.includes('kyberswap')) return colors.kyberswap;
-    if (name.includes('pyusd')) return colors.pyusd;
+    if (name.includes('sepoliapyusd')) return colors.pyusd;
     if (name === 'usdt') return colors.usdt;
     if (name === 'usdc') return colors.usdc;
     if (name.includes('1inch')) return colors.inch;
@@ -1445,7 +1445,7 @@ const Transactions = ({ setNodes, setEdges, nodes, edges, setActiveTabMain, mock
       '0xdac17f958d2ee523a2206206994597c13d831ec7': 'USDT',
       '0x264bd8291fae1d75db2c5f573b07faa6715997b5': 'Paxos 4',
       '0x6c3ea9036406852006290770bedfcaba0e23a0e8': 'PYUSD',
-      '0xcac524bca292aaade2df8a05cc58f0a65b1b3bb9': 'PYUSD Sepolia',
+      '0xcac524bca292aaade2df8a05cc58f0a65b1b3bb9': 'Sepolia PYUSD',
       '0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43': 'Coinbase 10',
       '0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf': 'Coinbase: cbBTC Token',
       '0x7a250d5630b4cf539739df2c5dacb4c659f2488d': 'Uniswap V2 Router',

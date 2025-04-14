@@ -87,7 +87,7 @@ The API is designed for developers building smart payment solutions and DeFi PYU
 - wallet connection (wagmi, ethers, reown)
 
 
-***Access Webapp here: **https://mira-x.netlify.app/*****
+***Access Webapp here: **https://mira-x.vercel.app/*****
 
 <hr>
 
@@ -224,6 +224,7 @@ The Sandbox is structured into three key sections: *Transactions*, *Wallets*, an
 - to fully test the Wallets tab — including High Activity status, active balances, and Staking in Pools — you can mock the following proxy addresses:
     * 0x9008d19f58aabd9ed0d60971565aa8510560ab41
     * 0x264bd8291fAE1D75DB2c5F573b07faA6715997B5 (Official Paxos 4)
+    * 0xA9D1e08C7793af67e9d92fe308d5697FB81d3E43
 
 - most PYUSD transactions are fun to explore in the Sandbox, but if you want to try one of the best I've come across so far, check this out:
     * 0x0385ceeb3d37f51323b3754b8eeaf306d81f3c66fbc8a1dc3070c8ea0bdb8e90

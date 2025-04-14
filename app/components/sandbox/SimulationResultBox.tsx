@@ -20,7 +20,7 @@ const SimulationResultBox = ({
     const gasUnits = BigInt(gasEstimate);
     const gasPriceWei = BigInt(gasPrice);
     const gasWei = gasUnits * gasPriceWei;
-    const gasEth = Number(ethers.formatEther(gasPriceWei * gasPriceWei));
+    const gasEth = Number(ethers.formatEther(gasPriceWei * gasUnits));
 
     const now = new Date();
     const currentHour = now.getUTCHours();
