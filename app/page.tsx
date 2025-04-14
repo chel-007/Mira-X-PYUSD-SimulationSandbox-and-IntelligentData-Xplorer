@@ -64,7 +64,7 @@ export default function Home() {
 
       <footer className={styles.footer}>
         <div className={styles.poweredBy}>Powered by PYUSD/GCP</div>
-        <div className={styles.copyright}>© 2025 _</div>
+        <div className={styles.copyright}>2025 _</div>
       </footer>
       <TelegramButton isOpen={isOpen} onClick={() => setIsOpen(!isOpen)} />
     </div>
