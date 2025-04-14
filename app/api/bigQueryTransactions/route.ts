@@ -274,7 +274,7 @@ export async function GET() {
     // }));
 
     console.log(swapVolumeData)
-    // console.log(timeOfDayData)
+    console.log(hourlyVelocity)
     // console.log("gas", gasComparisonData)
     console.log(poolMetricsData)
 

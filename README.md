@@ -68,7 +68,7 @@ the mocking feature can be initiated from the ***Transaction Trace Canvas*** or 
 
 > details on the Connect feature, also known as the MiraX Connect API
 
-after seeing the performance of MiraX's Data Provider, I was inspired to extend it. The WebSocket streams thousands of ***pyusd*** transactions daily, keeping everything up to date. Building the components to pull this data into the web app was extensive, so to make it more efficient, I decided to host similar components in a GCP container.
+after seeing the performance of MiraX's Data Provider, I was inspired to extend it. The WebSocket ***streams thousands of pyusd transactions*** daily, keeping everything up to date. Building the components to pull this data into the web app was extensive, so to make it more efficient, I decided to host similar components in a GCP container.
 
 I created a **WebSocket server** that *clients can connect to* using a ***required token***, allowing real-time, filtered, and analyzed PYUSD data to be passed to them for live insights
  
@@ -228,7 +228,7 @@ The Sandbox is structured into three key sections: *Transactions*, *Wallets*, an
 - most PYUSD transactions are fun to explore in the Sandbox, but if you want to try one of the best I've come across so far, check this out:
     * 0x0385ceeb3d37f51323b3754b8eeaf306d81f3c66fbc8a1dc3070c8ea0bdb8e90
 
-- Mira X mini Telegram Bot App [deployed to firebase](https://mirax-pyusd-insights.web.app/), source code [here](/mirax-mini-app/). *basically, you must deploy your app before you can convert it into a telegram Bot*
+- Mira X mini Telegram Bot App [deployed to firebase](https://mirax-pyusd-insights.web.app/), source code [here](/mirax-mini-app/). (*basically, you must deploy your app before you can convert it into a telegram Bot*)
 
 - MiraX Connect API, source code [here](/mirax-connect-api/), deployed to GCP Cloud Run. 
 
