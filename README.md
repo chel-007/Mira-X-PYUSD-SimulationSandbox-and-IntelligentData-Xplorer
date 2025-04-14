@@ -239,6 +239,13 @@ The Sandbox is structured into three key sections: *Transactions*, *Wallets*, an
 
 ### How to use MiraX - Video
 
+[![how to use video](images/thumbnail.png)]()
+
+
+> Courtesy of the bounty Sponsored BY: [**GCP** X **PayPal USD** x **StackUP**](https://hackathon.stackup.dev/web/events/seamless-transactions-infinite-possibilities)
+
+
+
 
 
 
